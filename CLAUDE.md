@@ -6,6 +6,60 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 （请在此处补充项目说明）
 
+---
+
+## 🚀 首次使用说明（新成员必读）
+
+clone 本仓库后，在开始使用 Claude Code 之前，请按以下步骤完成环境初始化：
+
+### 第一步：安装 Claude Code
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+### 第二步：安装 superpowers 技能包
+
+superpowers 是本项目强制依赖的工作流 skills 集合，提供 brainstorming / TDD / debugging 等能力：
+
+```bash
+# 方式一：通过 Claude Code 安装（推荐）
+claude mcp add superpowers
+
+# 方式二：手动克隆
+git clone https://github.com/obra/superpowers ~/.claude/skills/using-superpowers
+```
+
+### 第三步：安装 openspec CLI
+
+openspec 用于结构化管理变更提案，本项目已初始化：
+
+```bash
+npm i -g @fission-ai/openspec
+```
+
+### 第四步：验证安装
+
+```bash
+ls ~/.claude/skills/using-superpowers   # 应有输出
+command -v openspec && echo OK           # 应输出 OK
+ls openspec/                             # 应看到 changes/ specs/ 目录
+```
+
+### 第五步：开启 Claude Code
+
+```bash
+claude
+```
+
+首次启动时，`SessionStart` hook 会自动：
+- 创建 `.claude/notes/` 本地记忆目录（不提交到 git）
+- 触发会话启动协议，输出项目状态摘要
+
+> **注意**：`.claude/notes/` 是你的**本地私有记忆**，不会推送到远程，每个人独立维护。
+
+---
+
 <!-- ANTI_AMNESIA_BEGIN -->
 ---
 
