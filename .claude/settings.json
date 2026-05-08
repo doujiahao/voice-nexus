@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '【会话启动协议】请按 CLAUDE.md 顺序执行：1) Read .claude/notes/CURRENT.md  2) ls openspec/changes/ 若存在则 Read 各 proposal/tasks  3) git log --oneline -10  4) 用 5 行中文摘要报告恢复结果  5) 等待用户确认后再继续。'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); if echo \"$input\" | grep -qE '结束|收工|下班|today done|明天再|拜拜|byebye|睡觉|下次再'; then echo '【会话结束协议触发】用户表示要结束会话。Claude 必须立即：1) 更新 .claude/notes/CURRENT.md  2) 重大决策追加到 DECISIONS.md  3) 踩坑追加到 GOTCHAS.md  4) 完成后告知用户状态已落盘。未完成此协议前禁止结束。'; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -z \"$(find .claude/notes/CURRENT.md -mmin -120 2>/dev/null)\" ]; then echo '【提示】.claude/notes/CURRENT.md 已超过 2 小时未更新，若本次会话有实质进展请考虑刷新。'; fi"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/auto-commit-notes.sh 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

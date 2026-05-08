@@ -1,0 +1,92 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code when working with code in this repository.
+
+## 项目概述
+
+（请在此处补充项目说明）
+
+<!-- ANTI_AMNESIA_BEGIN -->
+---
+
+## 会话启动协议（强制执行 · 中度自检）
+
+每次新会话开始，Claude 必须按顺序执行以下步骤，未完成前禁止编写任何代码：
+
+0. **环境前置检查**（缺失则中止业务工作并提示用户安装）：
+   - Bash `ls ~/.claude/skills/using-superpowers 2>/dev/null` → 验证 superpowers 已装
+   - Bash `command -v openspec >/dev/null && echo OK` → 验证 openspec CLI 已装
+   - Bash `[ -d openspec ] && echo INITIALIZED` → 验证当前项目已 init
+   - 三项任意缺失：在「报告恢复结果」中标红提示，并阻止"新增/修复/重构"类任务
+1. **读取当前任务状态**：Read `.claude/notes/CURRENT.md`
+2. **读取讨论 backlog**（若用户提到"接着聊 / 讨论 / 那个话题"等）：Read `.claude/notes/BACKLOG.md`
+3. **读取活跃提案**（若 openspec 已初始化）：
+   - Bash `ls openspec/changes/ 2>/dev/null`
+   - 若有未归档目录，Read 各 `proposal.md` 与 `tasks.md`
+4. **回顾近期提交**：Bash `git log --oneline -10`
+5. **报告恢复结果**：用 5 行内中文摘要输出
+   - 上次进展：…
+   - 当前任务：…
+   - 待办事项：…
+   - 风险/阻塞：…
+   - 建议下一步：…
+6. **等待用户确认**后再继续
+
+## 会话结束协议（强制执行 · 自动落盘）
+
+会话即将结束（用户说"结束/收工/下班/today done/明天再说"，或 Stop hook 触发）时，Claude 必须：
+
+1. **更新 `.claude/notes/CURRENT.md`**，包含：
+   - `最后更新`：YYYY-MM-DD HH:MM
+   - `正在做什么`：当前任务一句话 + 已完成 / 进行中 / 未开始
+   - `关键决策`：本次会话产生的重要决定（追加，不覆盖历史）
+   - `下次会话第一件事`：明确到可执行命令或文件
+   - `风险/阻塞`：未解决问题
+2. **如有重大决策**，追加到 `.claude/notes/DECISIONS.md`（追加模式，永不删除）
+3. **如踩坑**，追加到 `.claude/notes/GOTCHAS.md`
+4. 最后用一句话告知用户："状态已落盘到 .claude/notes/CURRENT.md"
+
+## Skill 强制触发规则
+
+### 一、硬性前置依赖（不可省略）
+
+本项目**必须**安装并使用以下两套技能体系。会话启动时若检测到缺失，必须立即提示用户安装，不得跳过：
+
+| 技能体系 | 用途 | 安装/检测命令 | 缺失时的动作 |
+|---|---|---|---|
+| **superpowers** | 通用工作流 skills 集合（brainstorming / TDD / planning / debugging 等） | `ls ~/.claude/skills/using-superpowers 2>/dev/null` | 提示用户：「未检测到 superpowers，请先安装」并停止业务工作 |
+| **openspec** | 结构化变更提案与 spec delta 管理 | `command -v openspec && ls openspec/ 2>/dev/null` | 若工具未装：`npm i -g @fission-ai/openspec`；若仅项目未 init：`openspec init --tools claude` |
+
+**铁律**：未通过上述检测前，禁止开展任何"新增功能 / 修复 bug / 重构"类业务任务。
+回答纯咨询、读文档、查代码不受此限。
+
+### 二、按意图强制调用的 skill
+
+为避免"忘记调用 skill"，按下表强制触发，不再依赖 Claude 临场判断：
+
+| 用户意图关键词 | 必须调用的 Skill | 来源 |
+|---|---|---|
+| 继续 / 接着昨天 / 恢复 / 还在做 | openspec-context-loading | openspec |
+| 实现 / 开发 / 加功能 / 新需求 | brainstorming → openspec-propose | superpowers + openspec |
+| 修 bug / 报错 / 不对 / 异常 | systematic-debugging | superpowers |
+| 重构 / 优化 / 整理 | simplify | superpowers |
+| 写测试 / TDD | test-driven-development | superpowers |
+| 完成 / 提交 / 收工 | verification-before-completion | superpowers |
+| 多个独立子任务 | dispatching-parallel-agents | superpowers |
+| 写规划 / 列计划 | writing-plans → executing-plans | superpowers |
+| 提交前 review | requesting-code-review | superpowers |
+| 归档已完成的 openspec 变更 | openspec-archive-change | openspec |
+
+## 文件分层记忆架构
+
+```
+~/.claude/CLAUDE.md              个人全局偏好（语言、风格、硬规则）
+<project>/CLAUDE.md              本文件 — 项目规范 + 协议 + Skill 规则
+<project>/.claude/notes/
+  ├── CURRENT.md                 当前任务状态（每次会话末更新）
+  ├── BACKLOG.md                 待展开话题清单（识别但未深入的讨论）
+  ├── DECISIONS.md               重大决策日志（追加，永不删）
+  └── GOTCHAS.md                 踩坑记录（避免重复犯错）
+<project>/openspec/changes/      结构化变更提案（按 openspec skill 管理）
+```
+<!-- ANTI_AMNESIA_END -->

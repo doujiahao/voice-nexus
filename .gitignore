@@ -1,0 +1,31 @@
+## ide
+**/.idea
+*.iml
+rebel.xml
+
+## backend
+**/target
+**/logs
+
+## front
+**/*.lock
+os_del.cmd
+os_del_doc.cmd
+.svn
+derby.log
+.cursor
+.history
+.claude
+# === ANTI_AMNESIA_BEGIN ===
+# Claude Code 团队共享配置 vs 个人配置隔离规则
+# 设计原理：先整体忽略 .claude/，再用反向规则放行需共享部分
+.claude
+!.claude/
+.claude/*
+!.claude/notes/
+!.claude/scripts/
+!.claude/settings.json
+!.claude/scheduled_tasks.json
+# 个人偏好与权限白名单不入库
+.claude/settings.local.json
+# === ANTI_AMNESIA_END ===
