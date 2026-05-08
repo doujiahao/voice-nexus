@@ -22,10 +22,10 @@ derby.log
 .claude
 !.claude/
 .claude/*
-!.claude/notes/
 !.claude/scripts/
 !.claude/settings.json
 !.claude/scheduled_tasks.json
-# 个人偏好与权限白名单不入库
+# 个人笔记与偏好、权限白名单不入库
+.claude/notes/
 .claude/settings.local.json
 # === ANTI_AMNESIA_END ===
