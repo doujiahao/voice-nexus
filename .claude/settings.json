@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); if echo \"$input\" | grep -qE '结束|收工|下班|today done|明天再|拜拜|byebye|睡觉|下次再'; then echo '【会话结束协议触发】用户表示要结束会话。Claude 必须立即：1) 更新 .claude/notes/CURRENT.md  2) 重大决策追加到 DECISIONS.md  3) 踩坑追加到 GOTCHAS.md  4) 完成后告知用户状态已落盘。未完成此协议前禁止结束。'; fi"
+            "command": "input=$(cat); if echo \"$input\" | grep -qE '结束|收工|下班|today done|明天再|拜拜|byebye|睡觉|下次再|今天到这|到这了|今天就这|done for today'; then echo '【会话结束协议触发】用户表示要结束会话。Claude 必须立即：1) 更新 .claude/notes/CURRENT.md  2) 重大决策追加到 DECISIONS.md  3) 踩坑追加到 GOTCHAS.md  4) 完成后告知用户状态已落盘。未完成此协议前禁止结束。'; fi"
           }
         ]
       }
