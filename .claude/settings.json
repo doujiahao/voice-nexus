@@ -6,6 +6,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash .claude/scripts/bootstrap-notes.sh 2>/dev/null || true"
+          },
+          {
+            "type": "command",
             "command": "echo '【会话启动协议】请按 CLAUDE.md 顺序执行：1) Read .claude/notes/CURRENT.md  2) ls openspec/changes/ 若存在则 Read 各 proposal/tasks  3) git log --oneline -10  4) 用 5 行中文摘要报告恢复结果  5) 等待用户确认后再继续。'"
           }
         ]
