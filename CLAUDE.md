@@ -172,4 +172,88 @@ claude
 | 2026-05-08 | `.claude/notes/` 本地私有，不入库 | 个人笔记避免污染公共仓库 |
 | 2026-05-08 | `openspec/changes/` 入库共享 | 功能提案需团队可见 |
 | 2026-05-09 | 记忆基础设施放在 `feat/claude-memory-infra` 分支实验，不合入 master | 方案尚未确定为最佳路径，保持 master 干净 |
+| 2026-05-09 | 建立六阶段开发流水线（brainstorming→propose→plan→execute→verify→archive） | 解决代码扫描量大、业务链条断裂、token 浪费三大痛点 |
 <!-- ANTI_AMNESIA_END -->
+
+---
+
+## 文件分层记忆架构（完整版）
+
+```
+~/.claude/CLAUDE.md              个人全局偏好（语言、风格、硬规则）
+<project>/CLAUDE.md              本文件 — 项目规范 + 协议 + Skill 规则
+<project>/AGENTS.md              AI 行为协议（机器读，不含人工规范）
+<project>/ARCHITECTURE.md        系统架构地图（AI 定位代码的首要入口）
+<project>/docs/
+  product-specs/                 需求规格文档（brainstorming 产出）
+  design-docs/                   架构设计决策
+  exec-plans/
+    active/                      进行中的执行计划（进度追踪核心）
+    completed/                   已完成的执行计划
+    tech-debt-tracker.md         技术债登记
+  references/                    外部工具/框架的 llms.txt（节省 token）
+  generated/                     自动生成的文档（如 db-schema.md）
+<project>/openspec/changes/      结构化变更提案（按 openspec skill 管理）
+<project>/.claude/notes/
+  ├── CURRENT.md                 当前任务状态（每次会话末更新）
+  ├── BACKLOG.md                 待展开话题清单
+  ├── DECISIONS.md               重大决策日志（追加，永不删）
+  └── GOTCHAS.md                 踩坑记录（避免重复犯错）
+```
+
+---
+
+## 新增需求 / 页面变动流程规则
+
+### 三类页面变动决策树
+
+```
+收到需求
+  ├── 只改样式/文案？
+  │   └── YES → 直接执行，不立提案，不走 brainstorming
+  ├── 改了接口参数/表单字段/涉及前后端联动？
+  │   └── YES → 中量流程：brainstorming（梳理影响面）→ writing-plans → executing-plans
+  └── 全新功能页面/菜单？
+      └── YES → 完整六阶段，影响面清单必须包含「系统配置」区块
+```
+
+### JeecgBoot 影响面清单标准模板
+
+每个需求的 brainstorming spec 必须包含：
+
+```markdown
+## 影响面清单
+
+### 后端
+- Controller:
+- Service:
+- Mapper/XML:
+- DTO/Entity:
+- 数据库:
+
+### 前端
+- 页面: views/模块名/
+- API: api/模块名.ts
+- 路由: 是否需要新增
+- 组件:
+
+### 系统配置（JeecgBoot 特有，最容易漏！）
+- [ ] 菜单权限配置（sys_permission 表）
+- [ ] 按钮权限编码（查询/新增/编辑/删除/导出）
+- [ ] 数据权限（如需）
+
+### 旁路
+- 消息通知:
+- 日志记录:
+- 缓存失效:
+```
+
+### exec-plans 与 openspec 配合规则
+
+| openspec 管 | exec-plans 管 |
+|-------------|--------------|
+| 提案意图（要做什么/为什么） | 执行进度（做了多少/下一步） |
+| proposal.md + tasks.md | active/<功能>.md checklist |
+| 功能完成后归档到 archive/ | 功能完成后移入 completed/ |
+
+**两者同时维护，互相引用，不重复写内容。**
