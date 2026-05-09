@@ -29,3 +29,7 @@ derby.log
 .claude/notes/
 .claude/settings.local.json
 # === ANTI_AMNESIA_END ===
+
+# AI 临时草稿文件（会话结束前必须升级或删除）
+*.draft.md
+*.tmp.md

@@ -224,6 +224,37 @@ claude
 
 ---
 
+## AI 产出文档归宿规则（强制执行）
+
+### 文档落点速查表
+
+| 文档类型 | 必须存入的路径 | 是否入库 |
+|---|---|---|
+| brainstorming 产出 / 需求规格 | `docs/product-specs/<feature>.md` | ✅ |
+| 架构设计 / 技术方案 | `docs/design-docs/<feature>.md` | ✅ |
+| 执行计划 & 进度 checklist（进行中） | `docs/exec-plans/active/<feature>.md` | ✅ |
+| 执行计划（已完成） | `docs/exec-plans/completed/<feature>.md` | ✅ |
+| 变更提案（intent + why） | `openspec/changes/<feature>/` | ✅ |
+| 外部框架参考文档 / llms.txt | `docs/references/<tool>.md` | ✅ |
+| 自动生成文档（如 db-schema） | `docs/generated/<name>.md` | ✅ |
+| 会话中间状态 / 短命笔记 | `.claude/notes/`（私有） | ❌ gitignore |
+| 踩坑 / 决策日志 | `.claude/notes/GOTCHAS.md` / `DECISIONS.md` | ❌ gitignore |
+
+### 铁律
+
+1. **禁止在项目根目录生成 `.md` 文件**（README.md、CLAUDE.md、AGENTS.md 等已存在的规范文件除外）
+2. **禁止在 `docs/` 下平铺**，必须放入上表对应子目录
+3. **brainstorming 结束后**，产出的 spec 文件必须立即 `mv` 到 `docs/product-specs/`，不得遗留在其他位置
+4. **exec-plan 完成后**，文件必须从 `active/` 移入 `completed/`，不得原地保留
+
+### 临时草稿处理
+
+AI 对话中产生的临时 / 草稿文件，命名加 `.draft.md` 后缀，会话结束前必须：
+- 升级为正式文档 → 移入对应子目录并去掉 `.draft` 后缀
+- 或确认废弃 → 删除
+
+---
+
 ## 新增需求 / 页面变动流程规则
 
 ### 三类页面变动决策树
