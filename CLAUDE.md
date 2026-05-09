@@ -4,7 +4,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## 项目概述
 
-（请在此处补充项目说明）
+本项目是基于 JeecgBoot 的 **Java Web 项目统一脚手架**。
+
+> ⚠️ 强制规范：公司所有 Java Web 项目必须基于本脚手架进行开发，不得自行搭建项目结构。
+
+**技术栈**：Spring Boot + Vue3 + MyBatis-Plus + Ant Design Vue  
+**架构模式**：前后端分离，后端 Maven 多模块，前端 Vite + Vue3  
+**核心能力**：低代码在线表单、代码生成器、权限体系（Shiro + JWT）、工作流、报表
 
 ---
 
