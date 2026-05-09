@@ -1,20 +1,15 @@
-JeecgBoot 企业级低代码开发平台
+QJ-Boot 前端（Vue3）
 ===============
-当前最新版本： 3.9.1（预计发布时间：2026-01-22）
+
+> 前景脚手架前端模块，基于 JeecgBoot Vue3 定制。
 
 [![AUR](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/zhangdaiscott/jeecg-boot/blob/master/LICENSE)
-[![](https://img.shields.io/badge/Author-北京国炬软件-orange.svg)](http://jeecg.com/aboutusIndex)
-[![](https://img.shields.io/badge/version-3.9.1-brightgreen.svg)](https://github.com
-/zhangdaiscott/jeecg-boot)
-[![GitHub stars](https://img.shields.io/github/stars/zhangdaiscott/jeecg-boot.svg?style=social&label=Stars)](https://github.com/zhangdaiscott/jeecg-boot)
-[![GitHub forks](https://img.shields.io/github/forks/zhangdaiscott/jeecg-boot.svg?style=social&label=Fork)](https://github.com/zhangdaiscott/jeecg-boot)
-
-
+[![](https://img.shields.io/badge/维护方-前景科技-orange.svg)]()
+[![](https://img.shields.io/badge/技术栈-Vue3%20%2B%20Vite6%20%2B%20TypeScript-brightgreen.svg)]()
 
 ## 简介
-JeecgBoot-Vue3采用 Vue3.0、Vite、 Ant-Design-Vue4、TypeScript 等新技术方案，包括二次封装组件、utils、hooks、动态菜单、权限校验、按钮级别权限控制等功能。
- 
-> 强大的代码生成器让前后端代码一键生成! JeecgBoot引领低代码开发模式(OnlineCoding-> 代码生成-> 手工MERGE)， 帮助解决Java项目70%的重复工作，让开发更多关注业务。既能快速提高效率，节省成本，同时又不失灵活性
+
+QJ-Boot 前端采用 Vue3 + Vite6 + Ant-Design-Vue4 + TypeScript 技术栈，包含二次封装组件、utils、hooks、动态菜单、权限校验、按钮级别权限控制等功能。
 
 
 ## 开发环境搭建

@@ -1,34 +1,14 @@
-JeecgBoot 低代码开发平台
+QJ-Boot 后端（Spring Boot）
 ===============
 
-当前最新版本： 3.9.1（发布日期： 2026-01-22） 
-
+> 前景脚手架后端模块，基于 JeecgBoot SpringBoot3 定制。
 
 [![AUR](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/zhangdaiscott/jeecg-boot/blob/master/LICENSE)
-[![](https://img.shields.io/badge/Author-北京国炬软件-orange.svg)](http://jeecg.com/aboutusIndex)
-[![](https://img.shields.io/badge/version-3.9.1-brightgreen.svg)](https://github.com/zhangdaiscott/jeecg-boot)
-[![GitHub stars](https://img.shields.io/github/stars/zhangdaiscott/jeecg-boot.svg?style=social&label=Stars)](https://github.com/zhangdaiscott/jeecg-boot)
-[![GitHub forks](https://img.shields.io/github/forks/zhangdaiscott/jeecg-boot.svg?style=social&label=Fork)](https://github.com/zhangdaiscott/jeecg-boot)
+[![](https://img.shields.io/badge/维护方-前景科技-orange.svg)]()
+[![](https://img.shields.io/badge/技术栈-SpringBoot3%20%2B%20MyBatisPlus-brightgreen.svg)]()
 
 
 
-项目介绍
------------------------------------
-
-<h3 align="center">企业级AI低代码平台</h3>
-
-JeecgBoot 是一款基于BPM流程和代码生成的AI低代码平台，助力企业快速实现低代码开发和构建AI应用。
-采用前后端分离架构（Ant Design&Vue3，SpringBoot3，SpringCloud Alibaba，Mybatis-plus），强大代码生成器实现前后端一键生成，无需手写代码。
-平台引领AI低代码开发模式：AI生成→在线编码→代码生成→手工合并，解决Java项目80%重复工作，提升效率，节省成本，兼顾灵活性。
-具备强大且颗粒化的权限控制，支持按钮权限和数据权限设置，满足大型业务系统需求。功能涵盖在线表单、表单设计、流程设计、门户设计、报表与大屏设计、OA办公、AI应用、AI知识库、大模型管理、AI流程编排、AI聊天，支持ChatGPT、DeepSeek、Ollama等多种AI大模型。
-
-`AI赋能报表:` 积木报表是一款自主研发的强大开源企业级Web报表与大屏工具。它通过零编码的拖拽式操作，赋能用户如同搭积木般轻松构建各类复杂报表和数据大屏，全面满足企业数据可视化与分析需求，助力企业级数据产品的高效打造与应用。
-
-`AI赋能低代码:` 提供完善成熟的AI应用平台，涵盖AI应用管理、AI模型管理、智能对话助手、知识库问答、流程编排与设计器、AI建表等多项功能。平台兼容多种主流大模型，包括ChatGPT、DeepSeek、Ollama、智普、千问等，助力企业高效构建智能化应用，推动低代码开发与AI深度融合。
-
-`AI驱动开发:` 全新推出AI驱动开发能力，支持一句话生成完整系统，提供零代码模式（一句话搭建系统，无需编写代码）和代码生成模式（基于 jeecg-codegen，自动生成完整代码和建表SQL）两种选择。同时支持一句话自动绘制流程图、设计表单，省去手工绘制繁琐步骤。[B站视频演示](https://www.bilibili.com/video/BV1KKwTzJEbX/) | [技能对比与使用说明](https://help.jeecg.com/java/ai/skills/skill-comparison/)
-
-`JEECG宗旨是:` JEECG旨在通过OnlineCoding平台实现简单功能的零代码快速搭建，同时针对复杂功能采用代码生成器生成代码并手工合并，打造智能且灵活的低代码开发模式，有效解决了当前低代码产品普遍缺乏灵活性的问题，提升开发效率的同时兼顾系统的扩展性和定制化能力。
 
 `JEECG业务流程:` JEECG业务流程采用BPM工作流引擎实现业务审批，扩展任务接口供开发人员编写业务逻辑，表单提供表单设计器、在线配置表单和编码表单等多种解决方案。通过流程与表单的分离设计（松耦合）及任务节点的灵活配置，既保障了企业流程的安全性与保密性，又大幅降低了开发人员的工作量。
 

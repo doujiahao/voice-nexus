@@ -1,48 +1,25 @@
 中文 | [English](./README.en-US.md)
 
-JeecgBoot AI低代码平台
+前景脚手架（QJ-Boot）
 ===============
 
-当前最新版本： 3.9.1（发布日期：2026-01-28） 
-
+> 公司 Java Web 项目统一脚手架，基于 JeecgBoot 深度定制。  
+> ⚠️ 公司所有 Java Web 项目必须基于本脚手架开发，不得自行搭建项目结构。
 
 [![AUR](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/jeecgboot/JeecgBoot/blob/master/LICENSE)
-[![](https://img.shields.io/badge/Author-北京国炬软件-orange.svg)](https://jeecg.com)
-[![](https://img.shields.io/badge/blog-技术博客-orange.svg)](https://my.oschina.net/jeecg)
-[![](https://img.shields.io/badge/version-3.9.1-brightgreen.svg)](https://github.com/jeecgboot/JeecgBoot)
-[![GitHub stars](https://img.shields.io/github/stars/zhangdaiscott/jeecg-boot.svg?style=social&label=Stars)](https://github.com/jeecgboot/JeecgBoot)
-[![GitHub forks](https://img.shields.io/github/forks/zhangdaiscott/jeecg-boot.svg?style=social&label=Fork)](https://github.com/jeecgboot/JeecgBoot)
-
-
+[![](https://img.shields.io/badge/维护方-前景科技-orange.svg)]()
+[![](https://img.shields.io/badge/技术栈-SpringBoot3%20%2B%20Vue3-brightgreen.svg)]()
 
 项目介绍
 -----------------------------------
 
-<h3 align="center">企业级AI低代码平台</h3>
+<h3 align=”center”>前景科技 Java Web 统一脚手架</h3>
 
-JeecgBoot 是一款 AI 驱动的低代码开发平台，以"低代码 + 零代码"双模式覆盖从快速搭建到深度定制的全场景需求。零代码模式下，一句话即可搭建完整业务系统；
-代码生成模式下，AI 自动输出前后端代码、建表 SQL 与菜单权限，生成即可运行。
-平台内置 AI 聊天助手、知识库、流程编排、MCP 与插件体系，兼容主流大模型，同时支持一句话生成流程图、一句话设计表单、聊天式业务操作等智能能力。
-整体遵循"AI 生成 → 在线配置 → 代码生成 → 手工合并"的开发流程，解决 Java 项目中 80% 的重复工作，在大幅提升效率的同时保留充分的灵活性与可控性。
+**QJ-Boot** 是前景科技内部统一的 Java Web 开发脚手架，基于 JeecgBoot 进行定制改造。
 
----
-
-采用最新的前后端分离技术栈（Ant Design&Vue3，SpringBoot3，SpringCloud Alibaba，Mybatis-plus，具备强大且颗粒化的权限控制，支持按钮权限和数据权限设置，满足大型业务系统需求。功能涵盖在线表单、表单设计、流程设计、门户设计、报表与大屏设计、OA办公、AI应用、AI知识库、大模型管理、AI流程编排、AI聊天，支持ChatGPT、DeepSeek、Ollama等多种AI大模型。
-
-
-- `零代码能力:` 国内首个“低代码+零代码”双模驱动的AI智能开发平台！同时支持低代码和零代码; 让开发者用低代码，让业务人员在同一个平台上用零代码！
-
-- `AI驱动开发:` 全新推出AI驱动开发能力，支持一句话生成完整系统，提供零代码模式（一句话搭建系统，无需编写代码）和代码生成模式（基于 jeecg-codegen，自动生成完整代码和建表SQL）两种选择。同时支持一句话自动绘制流程图、设计表单，省去手工绘制繁琐步骤。[实战视频](https://www.bilibili.com/video/BV1KKwTzJEbX/) | [Skills技能清单](https://help.jeecg.com/java/ai/skills/skill-comparison/)
-
-- `AI智能报表:` JimuReport是一款自主研发的强大开源企业级Web报表工具。它通过零编码的拖拽式操作，赋能用户如同搭积木般轻松构建各类复杂报表，全面满足企业数据可视化与分析需求，助力企业级数据产品的高效打造与应用。
-
-- `AI智能大屏:` JimuBI一款自主研发的强大的大屏和仪表盘设计工具。专注数字孪生与数据可视化，支持交互式大屏、仪表盘、门户和移动端，实现“一次开发，多端适配”。 大屏设计类Word风格，支持多屏切换，自由拖拽，轻松打造炫酷动态界面。
-
-- `AI应用平台:` 盖AI应用管理、AI模型管理、智能对话助手、知识库问答、流程编排与设计器、AI建表、MCP插件配置等功能。平台兼容主流大模型，包括ChatGPT、DeepSeek、Ollama、智普、千问等，助力企业高效构建智能化应用，推动低代码开发与AI深度融合。
-
-- `JEECG宗旨是:` JEECG旨在通过OnlineCoding平台实现简单功能的零代码快速搭建，同时针对复杂功能采用代码生成器生成代码并手工合并，打造智能且灵活的低代码开发模式，有效解决了当前低代码产品普遍缺乏灵活性的问题，提升开发效率的同时兼顾系统的扩展性和定制化能力。
-
-- `JEECG业务流程:` JEECG业务流程采用BPM工作流引擎实现业务审批，扩展任务接口供开发人员编写业务逻辑，表单提供表单设计器、在线配置表单和编码表单等多种解决方案。通过流程与表单的分离设计（松耦合）及任务节点的灵活配置，既保障了企业流程的安全性与保密性，又大幅降低了开发人员的工作量。
+**技术栈**：Spring Boot 3 + Vue 3 + MyBatis-Plus + Ant Design Vue  
+**架构模式**：前后端分离，后端 Maven 多模块，前端 Vite + Vue3  
+**核心能力**：低代码在线表单、代码生成器、权限体系（Shiro + JWT）、工作流、报表
 
 
 
