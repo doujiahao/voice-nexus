@@ -137,6 +137,21 @@ claude
 | 提交前 review | requesting-code-review | superpowers |
 | 归档已完成的 openspec 变更 | openspec-archive-change | openspec |
 
+### 三、触发前必须报告（透明度规则）
+
+**每次识别到需要触发 skill 时，Claude 必须在执行前先用一行说明**，格式如下：
+
+> 🔧 **即将触发**：`<skill名称>` — 原因：<一句话说明为什么>
+
+示例：
+- 🔧 **即将触发**：`brainstorming` — 原因：用户提到「新增审批流功能」，属于全新功能需求
+- 🔧 **即将触发**：`systematic-debugging` — 原因：用户描述了 NPE 报错，需要系统排查根因
+- 🔧 **即将触发**：`openspec-propose` — 原因：brainstorming 已完成，进入提案创建阶段
+
+**此规则的目的**：让用户在 Claude 触发 skill 前可见、可干预，避免静默跳过或错误触发。
+
+> 若用户反对（如"不用走那个流程"），Claude 应立即取消触发并按用户指示执行。
+
 ## 文件分层记忆架构
 
 ```
