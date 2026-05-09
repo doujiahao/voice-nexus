@@ -4,7 +4,7 @@ QJ-Boot 前端（Vue3）
 > 前景脚手架前端模块，基于 JeecgBoot Vue3 定制。
 
 [![AUR](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/zhangdaiscott/jeecg-boot/blob/master/LICENSE)
-[![](https://img.shields.io/badge/维护方-前景科技-orange.svg)]()
+[![](https://img.shields.io/badge/维护方-前景无忧-orange.svg)]()
 [![](https://img.shields.io/badge/技术栈-Vue3%20%2B%20Vite6%20%2B%20TypeScript-brightgreen.svg)]()
 
 ## 简介

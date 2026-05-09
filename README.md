@@ -7,15 +7,15 @@
 > ⚠️ 公司所有 Java Web 项目必须基于本脚手架开发，不得自行搭建项目结构。
 
 [![AUR](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/jeecgboot/JeecgBoot/blob/master/LICENSE)
-[![](https://img.shields.io/badge/维护方-前景科技-orange.svg)]()
+[![](https://img.shields.io/badge/维护方-前景无忧-orange.svg)]()
 [![](https://img.shields.io/badge/技术栈-SpringBoot3%20%2B%20Vue3-brightgreen.svg)]()
 
 项目介绍
 -----------------------------------
 
-<h3 align=”center”>前景科技 Java Web 统一脚手架</h3>
+<h3 align=”center”>前景无忧 Java Web 统一脚手架</h3>
 
-**QJ-Boot** 是前景科技内部统一的 Java Web 开发脚手架，基于 JeecgBoot 进行定制改造。
+**QJ-Boot** 是前景无忧内部统一的 Java Web 开发脚手架，基于 JeecgBoot 进行定制改造。
 
 **技术栈**：Spring Boot 3 + Vue 3 + MyBatis-Plus + Ant Design Vue  
 **架构模式**：前后端分离，后端 Maven 多模块，前端 Vite + Vue3  
