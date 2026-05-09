@@ -1,4 +1,29 @@
 {
+  "permissions": {
+    "allow": [
+      "Edit(*)",
+      "Write(*)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(cd *)",
+      "Bash(chmod *)",
+      "Bash(bash *)",
+      "Bash(python3 *)",
+      "Bash(pnpm *)",
+      "Bash(mysql -u *)",
+      "Bash(curl -s *)",
+      "Bash(mvn *)",
+      "Bash(openspec *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(ls openspec/changes/)",
+      "Bash(ls openspec/*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
