@@ -21,7 +21,11 @@
       "Bash(git remote *)",
       "Bash(git branch *)",
       "Bash(ls openspec/changes/)",
-      "Bash(ls openspec/*)"
+      "Bash(ls openspec/*)",
+      "Bash(git check-ignore *)",
+      "Bash(touch *)",
+      "Bash(cat >> *)",
+      "Bash(command -v *)"
     ]
   },
   "hooks": {
