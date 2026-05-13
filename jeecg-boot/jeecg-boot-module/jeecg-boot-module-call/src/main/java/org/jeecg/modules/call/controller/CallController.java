@@ -119,6 +119,18 @@ public class CallController {
                 new LambdaQueryWrapper<CallTurn>().eq(CallTurn::getSessionId, callSessionId));
         data.put("turn_count", turnCount);
 
+        // summary（来自 call_session.summary 字段，NLP session-summary 结果存在这里）
+        if (session.getSummary() != null && !session.getSummary().isEmpty()) {
+            try {
+                JSONObject summary = com.alibaba.fastjson.JSON.parseObject(session.getSummary());
+                data.put("summary", summary);
+            } catch (Exception e) {
+                JSONObject summary = new JSONObject();
+                summary.put("summary", session.getSummary());
+                data.put("summary", summary);
+            }
+        }
+
         return Result.OK(data);
     }
 
@@ -149,5 +161,35 @@ public class CallController {
         JSONObject result = new JSONObject();
         result.put("items", items);
         return Result.OK(result);
+    }
+
+    @Operation(summary = "开启通话会话（前端备用）")
+    @PostMapping("/calls/open")
+    public Result<JSONObject> openCall(@RequestBody JSONObject body) {
+        String agentId = body.getString("agent_id");
+        String fsCallId = body.getString("fs_call_id");
+        String phone = body.getString("phone");
+        String customerName = body.getString("customer_name");
+
+        CallSession session = new CallSession();
+        session.setFsCallId(fsCallId);
+        session.setDirection("INBOUND");
+        session.setStatus("TALKING");
+        session.setCustomerPhone(phone);
+        session.setAnswerTime(new Date());
+
+        // 匹配坐席
+        if (agentId != null) {
+            AgentProfile profile = agentProfileService.getByUserId(agentId);
+            if (profile != null) {
+                session.setAgentId(profile.getId());
+            }
+        }
+
+        callSessionService.save(session);
+
+        JSONObject data = new JSONObject();
+        data.put("call_session_id", session.getId());
+        return Result.OK(data);
     }
 }
