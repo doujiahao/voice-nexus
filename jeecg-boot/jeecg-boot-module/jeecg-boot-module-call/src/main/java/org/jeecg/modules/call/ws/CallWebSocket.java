@@ -33,9 +33,7 @@ public class CallWebSocket {
         SESSION_POOL.put(userId, session);
         redisUtil.set(REDIS_WS_PREFIX + userId, "1");
         log.info("【话务WS】连接建立: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
-
-        // 发送连接确认
-        sendMessage(userId, buildAck("connected", userId));
+        sendMessage(userId, "{\"type\":\"connected\",\"userId\":\"" + userId + "\"}");
     }
 
     @OnClose
@@ -52,12 +50,14 @@ public class CallWebSocket {
             JSONObject msg = JSON.parseObject(message);
             String type = msg.getString("type");
 
-            if ("heartbeat".equals(type)) {
-                sendMessage(userId, "{\"type\":\"heartbeat_ack\"}");
+            if ("ping".equals(type)) {
+                JSONObject pong = new JSONObject();
+                pong.put("type", "pong");
+                pong.put("ts", msg.getLong("ts"));
+                sendMessage(userId, pong.toJSONString());
                 return;
             }
 
-            // 坐席操作消息交给 handler 处理
             CallWsMessageHandler.handle(userId, msg);
         } catch (Exception e) {
             log.error("【话务WS】消息处理异常: userId={}", userId, e);
@@ -82,23 +82,49 @@ public class CallWebSocket {
         }
     }
 
-    public static void sendToAgent(String agentUserId, String eventType, Object data) {
+    public static void pushIncomingCall(String agentUserId, String callId, String phone, String callerName, String fsCallId) {
         JSONObject msg = new JSONObject();
-        msg.put("type", eventType);
-        msg.put("data", data);
-        msg.put("timestamp", System.currentTimeMillis());
+        msg.put("type", "incoming_call");
+        msg.put("call_id", callId);
+        msg.put("phone", phone);
+        msg.put("caller_name", callerName);
+        msg.put("fs_call_id", fsCallId);
+        sendMessage(agentUserId, msg.toJSONString());
+    }
+
+    public static void pushCallSession(String agentUserId, String callSessionId) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "call_session");
+        msg.put("call_session_id", callSessionId);
+        sendMessage(agentUserId, msg.toJSONString());
+    }
+
+    public static void pushAgentStatus(String agentUserId, String status) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "agent_status");
+        msg.put("status", status);
+        sendMessage(agentUserId, msg.toJSONString());
+    }
+
+    public static void pushCallState(String agentUserId, String state) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "call_state");
+        msg.put("state", state);
+        sendMessage(agentUserId, msg.toJSONString());
+    }
+
+    public static void pushAsrResult(String agentUserId, String correctedText, String speakerRole, String speakerName, String intent) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "asr_result");
+        msg.put("corrected_text", correctedText);
+        msg.put("speaker_role", speakerRole);
+        msg.put("speaker_name", speakerName);
+        msg.put("ts", java.time.Instant.now().toString());
+        if (intent != null) msg.put("intent", intent);
         sendMessage(agentUserId, msg.toJSONString());
     }
 
     public static boolean isOnline(String userId) {
         return SESSION_POOL.containsKey(userId);
-    }
-
-    private String buildAck(String type, String userId) {
-        JSONObject ack = new JSONObject();
-        ack.put("type", type);
-        ack.put("userId", userId);
-        ack.put("timestamp", System.currentTimeMillis());
-        return ack.toJSONString();
     }
 }

@@ -27,66 +27,55 @@ public class CallWsMessageHandler {
 
     public static void handle(String userId, JSONObject msg) {
         String type = msg.getString("type");
-        String requestId = msg.getString("request_id");
 
         switch (type) {
-            case "call_accept":
-                handleCallAccept(userId, msg, requestId);
+            case "call_response":
+                handleCallResponse(userId, msg);
                 break;
-            case "call_reject":
-                handleCallReject(userId, msg, requestId);
+            case "agent_status_update":
+                handleStatusUpdate(userId, msg);
                 break;
-            case "call_hangup":
-                handleCallHangup(userId, msg, requestId);
-                break;
-            case "agent_status_change":
-                handleStatusChange(userId, msg, requestId);
+            case "auth":
+                // token 认证已在连接时通过 query param 处理，此处忽略
                 break;
             default:
-                sendAck(userId, requestId, false, "unknown message type: " + type);
+                log.warn("【话务WS】未知消息类型: type={}, userId={}", type, userId);
                 break;
         }
     }
 
-    private static void handleCallAccept(String userId, JSONObject msg, String requestId) {
-        String sessionId = msg.getString("session_id");
-        callSessionService.updateStatus(sessionId, "TALKING");
-        agentProfileService.changeStatus(userId, AgentStatusEnum.TALKING, "坐席接听");
-        sendAck(userId, requestId, true, null);
+    private static void handleCallResponse(String userId, JSONObject msg) {
+        String callId = msg.getString("call_id");
+        String action = msg.getString("action");
+
+        if ("accept".equals(action)) {
+            callSessionService.updateStatus(callId, "TALKING");
+            agentProfileService.changeStatus(userId, AgentStatusEnum.TALKING, "坐席接听");
+            CallWebSocket.pushCallState(userId, "active");
+            CallWebSocket.pushCallSession(userId, callId);
+        } else if ("reject".equals(action)) {
+            callSessionService.updateStatus(callId, "QUEUING");
+            agentProfileService.changeStatus(userId, AgentStatusEnum.ONLINE, "坐席拒接");
+            CallWebSocket.pushCallState(userId, "idle");
+        }
     }
 
-    private static void handleCallReject(String userId, JSONObject msg, String requestId) {
-        String sessionId = msg.getString("session_id");
-        callSessionService.updateStatus(sessionId, "QUEUING");
-        agentProfileService.changeStatus(userId, AgentStatusEnum.ONLINE, "坐席拒接");
-        sendAck(userId, requestId, true, null);
-    }
-
-    private static void handleCallHangup(String userId, JSONObject msg, String requestId) {
-        String sessionId = msg.getString("session_id");
-        agentProfileService.changeStatus(userId, AgentStatusEnum.WRAP_UP, "坐席挂断");
-        sendAck(userId, requestId, true, null);
-    }
-
-    private static void handleStatusChange(String userId, JSONObject msg, String requestId) {
-        String newStatus = msg.getString("status");
-        try {
-            AgentStatusEnum statusEnum = AgentStatusEnum.fromCode(newStatus);
+    private static void handleStatusUpdate(String userId, JSONObject msg) {
+        String status = msg.getString("status");
+        AgentStatusEnum statusEnum = mapFrontendStatus(status);
+        if (statusEnum != null) {
             agentProfileService.changeStatus(userId, statusEnum, "坐席手动切换");
-            sendAck(userId, requestId, true, null);
-        } catch (IllegalArgumentException e) {
-            sendAck(userId, requestId, false, "invalid status: " + newStatus);
+            CallWebSocket.pushAgentStatus(userId, status);
         }
     }
 
-    private static void sendAck(String userId, String requestId, boolean success, String error) {
-        JSONObject ack = new JSONObject();
-        ack.put("type", "ack");
-        ack.put("request_id", requestId);
-        ack.put("success", success);
-        if (error != null) {
-            ack.put("error", error);
+    private static AgentStatusEnum mapFrontendStatus(String frontendStatus) {
+        switch (frontendStatus) {
+            case "idle": return AgentStatusEnum.ONLINE;
+            case "busy": return AgentStatusEnum.REST;
+            case "offline": return AgentStatusEnum.OFFLINE;
+            case "on_call": return AgentStatusEnum.TALKING;
+            default: return null;
         }
-        CallWebSocket.sendMessage(userId, ack.toJSONString());
     }
 }
