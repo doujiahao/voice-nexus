@@ -33,11 +33,6 @@
 		<java.version>17</java.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-		<!-- 微服务 -->
-		<spring-cloud.version>2025.0.0</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.3.3</spring-cloud-alibaba.version>
-		<alibaba.nacos.version>2.0.4</alibaba.nacos.version>
-
 		<xxl-job-core.version>2.4.1</xxl-job-core.version>
         <fastjson.version>2.0.57</fastjson.version>
         <aviator.version>5.2.6</aviator.version>
@@ -164,23 +159,6 @@
 
 	<dependencyManagement>
 		<dependencies>
-			<!-- spring-cloud-->
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring-cloud.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-			<!-- spring-cloud-alibaba -->
-			<dependency>
-				<groupId>com.alibaba.cloud</groupId>
-				<artifactId>spring-cloud-alibaba-dependencies</artifactId>
-                <version>${spring-cloud-alibaba.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-
 			<!-- system 模块-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
@@ -206,19 +184,6 @@
 				<artifactId>jeecg-system-local-api</artifactId>
 				<version>${jeecgboot.version}</version>
 			</dependency>
-			<!-- system 微服务 api -->
-			<dependency>
-				<groupId>org.jeecgframework.boot3</groupId>
-				<artifactId>jeecg-system-cloud-api</artifactId>
-				<version>${jeecgboot.version}</version>
-			</dependency>
-
-            <!--微服务启动依赖-->
-            <dependency>
-                <groupId>org.jeecgframework.boot3</groupId>
-                <artifactId>jeecg-boot-starter-cloud</artifactId>
-                <version>${jeecgboot.version}</version>
-            </dependency>
 			<!--xxl-job定时任务-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
@@ -734,17 +699,5 @@
 				<config.password></config.password>
             </properties>
         </profile>
-		<!-- SpringCloud运行环境 -->
-		<profile>
-			<id>SpringCloud</id>
-			<activation>
-				<!--默认激活配置-->
-				<activeByDefault>true</activeByDefault>
-			</activation>
-			<modules>
-				<!-- 微服务模块 -->
-				<module>jeecg-server-cloud</module>
-			</modules>
-		</profile>
     </profiles>
 </project>
