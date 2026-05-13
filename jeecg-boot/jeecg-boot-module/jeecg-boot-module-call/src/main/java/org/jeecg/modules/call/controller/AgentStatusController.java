@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Tag(name = "坐席状态管理")
 @RestController
-@RequestMapping("/call/agent")
+@RequestMapping("/api/v1/agent")
 public class AgentStatusController {
 
     @Autowired

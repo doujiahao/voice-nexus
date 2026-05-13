@@ -22,6 +22,6 @@ public class CallWebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(internalAuthInterceptor())
-                .addPathPatterns("/call/internal/**");
+                .addPathPatterns("/api/v1/internal/**");
     }
 }

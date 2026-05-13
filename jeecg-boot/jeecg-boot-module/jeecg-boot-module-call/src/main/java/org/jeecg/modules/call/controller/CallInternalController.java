@@ -16,7 +16,7 @@ import java.util.Map;
 @Slf4j
 @Tag(name = "内部接口 - freeswichService")
 @RestController
-@RequestMapping("/call/internal")
+@RequestMapping("/api/v1/internal")
 public class CallInternalController {
 
     @Autowired
