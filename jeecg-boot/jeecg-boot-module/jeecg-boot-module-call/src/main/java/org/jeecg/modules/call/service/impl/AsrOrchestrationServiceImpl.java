@@ -8,10 +8,10 @@ import org.jeecg.common.util.MinioUtil;
 import org.jeecg.modules.call.config.CallProperties;
 import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.entity.CallTurn;
+import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.mapper.CallTurnMapper;
 import org.jeecg.modules.call.service.IAsrOrchestrationService;
 import org.jeecg.modules.call.service.ICallContextService;
-import org.jeecg.modules.call.service.ICallSessionService;
 import org.jeecg.modules.call.service.INlpOrchestrationService;
 import org.jeecg.modules.call.ws.CallWebSocket;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +35,7 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
     @Autowired
     private CallTurnMapper callTurnMapper;
     @Autowired
-    private ICallSessionService callSessionService;
+    private CallSessionMapper callSessionMapper;
     @Autowired
     private ICallContextService callContextService;
     @Autowired
@@ -121,13 +121,15 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         turnCtx.put("emotion", turn.getEmotion());
         callContextService.appendTurn(sessionId, turnCtx);
 
-        pushToFrontend(sessionId, turn, data);
+        CallSession session = callSessionMapper.selectById(sessionId);
+        pushToFrontend(session, turn, data);
 
-        nlpOrchestrationService.analyzeAgentAssist(sessionId, turn.getId());
+        if (session != null) {
+            nlpOrchestrationService.analyzeAgentAssist(session, turn.getId());
+        }
     }
 
-    private void pushToFrontend(String sessionId, CallTurn turn, JSONObject data) {
-        CallSession session = callSessionService.getById(sessionId);
+    private void pushToFrontend(CallSession session, CallTurn turn, JSONObject data) {
         if (session == null || session.getAgentId() == null) {
             return;
         }

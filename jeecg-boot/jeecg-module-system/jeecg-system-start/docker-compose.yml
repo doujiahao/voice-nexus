@@ -1,0 +1,19 @@
+services:
+  voice-nexus:
+    build: .
+    image: voice-nexus:3.9.1
+    container_name: voice-nexus
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+      - PARAMS=--spring.profiles.active=dev --server.port=8080 --logging.file.path=./log --mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl
+      - JAVA_OPTS=-server -Xmx2048M -Xms2048M
+    ports:
+      - 19157:8080
+    volumes:
+      - ./log:/build/log
+      - ./jeecg-system-start-3.9.1.jar:/build/app.jar
+    extra_hosts:
+      - "node01:192.168.1.21"
+      - "node02:192.168.1.22"
+      - "node03:192.168.1.23"

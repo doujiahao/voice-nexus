@@ -121,6 +121,6 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
             }
         }
 
-        callEndProcessor.processCallEnd(session.getId());
+        callEndProcessor.processCallEnd(session);
     }
 }

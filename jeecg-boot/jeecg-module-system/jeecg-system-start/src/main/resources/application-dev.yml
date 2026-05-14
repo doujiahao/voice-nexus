@@ -275,9 +275,9 @@ jeecg:
   # 话务平台配置
   call:
     internal:
-      secret-key: changeme-internal-key
+      secret-key: ${CALL_INTERNAL_SECRET_KEY:changeme-internal-key}
     gateway:
-      base-url: http://192.168.1.21:30001
+      base-url: ${CALL_GATEWAY_URL:http://192.168.1.21:30001}
   #大屏报表参数设置
   jmreport:
     #多租户模式，默认值为空(created:按照创建人隔离、tenant:按照租户隔离) (v1.6.2+ 新增)

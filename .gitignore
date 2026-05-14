@@ -30,6 +30,9 @@ derby.log
 .claude/settings.local.json
 # === ANTI_AMNESIA_END ===
 
+# 部署环境变量（含密码，禁止入库）
+.env
+
 # AI 临时草稿文件（会话结束前必须升级或删除）
 *.draft.md
 *.tmp.md

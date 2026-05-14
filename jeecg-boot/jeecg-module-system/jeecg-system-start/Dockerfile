@@ -1,18 +1,6 @@
-FROM registry.cn-hangzhou.aliyuncs.com/dockerhub_mirror/java:17-anolis
-
-MAINTAINER jeecgos@163.com
-
-RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-
-#RUN mkdir -p /jeecg-boot/config/jeecg/
-
-WORKDIR /jeecg-boot
-
-EXPOSE 8080
-
-#ADD ./src/main/resources/jeecg ./config/jeecg
-ADD ./target/jeecg-system-start-3.9.1.jar ./
-
-RUN mkdir -p /jeecg-boot/config
-
-CMD sleep 60;java -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom -jar jeecg-system-start-3.9.1.jar
+FROM 192.168.1.22:30003/library/eclipse-temurin:21.0.1_12-jdk-alpine
+ENV LANG=C.UTF-8
+ENV PARAMS=""
+WORKDIR /build
+COPY ./*.jar /build/app.jar
+ENTRYPOINT java ${JAVA_OPTS} -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai -jar /build/app.jar ${PARAMS}

@@ -5,9 +5,9 @@ import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.entity.CallTag;
+import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.mapper.CallTagMapper;
 import org.jeecg.modules.call.service.ICallContextService;
-import org.jeecg.modules.call.service.ICallSessionService;
 import org.jeecg.modules.call.service.INlpOrchestrationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.Date;
-import java.util.List;
 
 @Slf4j
 @Component
@@ -26,20 +25,18 @@ public class CallEndProcessor {
     @Autowired
     private ICallContextService callContextService;
     @Autowired
-    private ICallSessionService callSessionService;
+    private CallSessionMapper callSessionMapper;
     @Autowired
     private CallTagMapper callTagMapper;
 
     @Async
-    public void processCallEnd(String sessionId) {
+    public void processCallEnd(CallSession session) {
+        String sessionId = session.getId();
         try {
-            JSONObject summary = nlpOrchestrationService.generateSessionSummary(sessionId);
+            JSONObject summary = nlpOrchestrationService.generateSessionSummary(session);
             if (summary != null) {
-                CallSession session = callSessionService.getById(sessionId);
-                if (session != null) {
-                    session.setSummary(summary.toJSONString());
-                    callSessionService.updateById(session);
-                }
+                session.setSummary(summary.toJSONString());
+                callSessionMapper.updateById(session);
                 generateTags(sessionId, summary);
             }
         } catch (Exception e) {

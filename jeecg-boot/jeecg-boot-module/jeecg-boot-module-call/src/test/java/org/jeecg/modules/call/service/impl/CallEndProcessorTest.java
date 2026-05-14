@@ -3,9 +3,9 @@ package org.jeecg.modules.call.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.entity.CallTag;
+import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.mapper.CallTagMapper;
 import org.jeecg.modules.call.service.ICallContextService;
-import org.jeecg.modules.call.service.ICallSessionService;
 import org.jeecg.modules.call.service.INlpOrchestrationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +25,7 @@ class CallEndProcessorTest {
 
     @Mock private INlpOrchestrationService nlpOrchestrationService;
     @Mock private ICallContextService callContextService;
-    @Mock private ICallSessionService callSessionService;
+    @Mock private CallSessionMapper callSessionMapper;
     @Mock private CallTagMapper callTagMapper;
 
     @InjectMocks
@@ -33,26 +33,21 @@ class CallEndProcessorTest {
 
     @Test
     void processCallEnd_shouldGenerateSummaryAndTags() {
-        String sessionId = "sess-001";
+        CallSession session = new CallSession();
+        session.setId("sess-001");
 
         JSONObject summary = new JSONObject();
         summary.put("customer_intent", "报修停电");
         summary.put("emotion", "angry");
         summary.put("keywords", List.of("停电", "报修", "紧急"));
+        when(nlpOrchestrationService.generateSessionSummary(session)).thenReturn(summary);
+        when(callSessionMapper.updateById(any(CallSession.class))).thenReturn(1);
 
-        when(nlpOrchestrationService.generateSessionSummary(sessionId)).thenReturn(summary);
+        callEndProcessor.processCallEnd(session);
 
-        CallSession session = new CallSession();
-        session.setId(sessionId);
-        when(callSessionService.getById(sessionId)).thenReturn(session);
-        when(callSessionService.updateById(any())).thenReturn(true);
-
-        callEndProcessor.processCallEnd(sessionId);
-
-        verify(callSessionService).updateById(argThat(s -> {
-            CallSession cs = (CallSession) s;
-            return cs.getSummary() != null && cs.getSummary().contains("报修停电");
-        }));
+        ArgumentCaptor<CallSession> sessionCaptor = ArgumentCaptor.forClass(CallSession.class);
+        verify(callSessionMapper).updateById(sessionCaptor.capture());
+        assertTrue(sessionCaptor.getValue().getSummary().contains("报修停电"));
 
         // 3 keywords + 1 intent + 1 emotion = 5 tags
         ArgumentCaptor<CallTag> tagCaptor = ArgumentCaptor.forClass(CallTag.class);
@@ -63,28 +58,30 @@ class CallEndProcessorTest {
         assertTrue(tags.stream().anyMatch(t -> "NLP_INTENT".equals(t.getSource()) && "报修停电".equals(t.getTagName())));
         assertTrue(tags.stream().anyMatch(t -> "NLP_EMOTION".equals(t.getSource()) && "angry".equals(t.getTagName())));
 
-        verify(callContextService).clearContext(sessionId);
+        verify(callContextService).clearContext("sess-001");
     }
 
     @Test
-    void processCallEnd_shouldClearContextEvenWhenSummaryNull() {
-        String sessionId = "sess-002";
-        when(nlpOrchestrationService.generateSessionSummary(sessionId)).thenReturn(null);
+    void processCallEnd_shouldClearContextWhenSummaryNull() {
+        CallSession session = new CallSession();
+        session.setId("sess-002");
+        when(nlpOrchestrationService.generateSessionSummary(session)).thenReturn(null);
 
-        callEndProcessor.processCallEnd(sessionId);
+        callEndProcessor.processCallEnd(session);
 
-        verify(callSessionService, never()).updateById(any());
+        verify(callSessionMapper, never()).updateById(any(CallSession.class));
         verify(callTagMapper, never()).insert(any(CallTag.class));
-        verify(callContextService).clearContext(sessionId);
+        verify(callContextService).clearContext("sess-002");
     }
 
     @Test
     void processCallEnd_shouldClearContextEvenOnException() {
-        String sessionId = "sess-003";
-        when(nlpOrchestrationService.generateSessionSummary(sessionId)).thenThrow(new RuntimeException("gateway down"));
+        CallSession session = new CallSession();
+        session.setId("sess-003");
+        when(nlpOrchestrationService.generateSessionSummary(session)).thenThrow(new RuntimeException("gateway down"));
 
-        callEndProcessor.processCallEnd(sessionId);
+        callEndProcessor.processCallEnd(session);
 
-        verify(callContextService).clearContext(sessionId);
+        verify(callContextService).clearContext("sess-003");
     }
 }

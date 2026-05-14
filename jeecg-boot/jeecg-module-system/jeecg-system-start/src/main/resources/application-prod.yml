@@ -181,6 +181,12 @@ mybatis-plus:
 minidao:
   base-package: org.jeecg.modules.jmreport.*,org.jeecg.modules.drag.*
 jeecg:
+  # 话务平台配置
+  call:
+    internal:
+      secret-key: ${CALL_INTERNAL_SECRET_KEY:changeme-internal-key}
+    gateway:
+      base-url: ${CALL_GATEWAY_URL:http://192.168.1.21:30001}
   # AI集成
   ai-chat:
     enabled: true
