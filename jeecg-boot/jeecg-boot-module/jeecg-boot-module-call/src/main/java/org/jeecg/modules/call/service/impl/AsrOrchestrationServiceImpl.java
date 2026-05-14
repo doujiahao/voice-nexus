@@ -10,7 +10,9 @@ import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.entity.CallTurn;
 import org.jeecg.modules.call.mapper.CallTurnMapper;
 import org.jeecg.modules.call.service.IAsrOrchestrationService;
+import org.jeecg.modules.call.service.ICallContextService;
 import org.jeecg.modules.call.service.ICallSessionService;
+import org.jeecg.modules.call.service.INlpOrchestrationService;
 import org.jeecg.modules.call.ws.CallWebSocket;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -34,6 +36,10 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
     private CallTurnMapper callTurnMapper;
     @Autowired
     private ICallSessionService callSessionService;
+    @Autowired
+    private ICallContextService callContextService;
+    @Autowired
+    private INlpOrchestrationService nlpOrchestrationService;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -106,7 +112,18 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         turn.setCreateTime(new Date());
         callTurnMapper.insert(turn);
 
+        JSONObject turnCtx = new JSONObject();
+        turnCtx.put("turn_id", turn.getId());
+        turnCtx.put("speaker_role", speakerRole);
+        turnCtx.put("speaker_name", speakerName);
+        turnCtx.put("corrected_text", turn.getCorrectedText() != null ? turn.getCorrectedText() : turn.getText());
+        turnCtx.put("intent", turn.getIntent());
+        turnCtx.put("emotion", turn.getEmotion());
+        callContextService.appendTurn(sessionId, turnCtx);
+
         pushToFrontend(sessionId, turn, data);
+
+        nlpOrchestrationService.analyzeAgentAssist(sessionId, turn.getId());
     }
 
     private void pushToFrontend(String sessionId, CallTurn turn, JSONObject data) {
