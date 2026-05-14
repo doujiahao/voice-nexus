@@ -192,4 +192,59 @@ public class CallController {
         data.put("call_session_id", session.getId());
         return Result.OK(data);
     }
+
+    @Operation(summary = "获取录音预签名URL")
+    @GetMapping("/calls/{callSessionId}/audio-url")
+    public Result<JSONObject> getAudioUrl(@PathVariable String callSessionId,
+                                          @RequestParam(name = "turn_id", required = false) String turnId) {
+        JSONObject data = new JSONObject();
+
+        if (turnId != null) {
+            CallTurn turn = callTurnMapper.selectById(turnId);
+            if (turn != null && turn.getAudioUrl() != null) {
+                String url = org.jeecg.common.util.MinioUtil.getObjectUrl(
+                        org.jeecg.common.util.MinioUtil.getBucketName(), turn.getAudioUrl(), 3600);
+                data.put("url", url);
+                data.put("turn_id", turnId);
+            }
+        } else {
+            List<CallTurn> turns = callTurnMapper.selectList(
+                    new LambdaQueryWrapper<CallTurn>()
+                            .eq(CallTurn::getSessionId, callSessionId)
+                            .isNotNull(CallTurn::getAudioUrl)
+                            .orderByAsc(CallTurn::getTurnIndex));
+            List<JSONObject> urls = turns.stream().map(t -> {
+                JSONObject item = new JSONObject();
+                item.put("turn_id", t.getId());
+                item.put("turn_index", t.getTurnIndex());
+                item.put("speaker_role", t.getSpeakerRole());
+                item.put("url", org.jeecg.common.util.MinioUtil.getObjectUrl(
+                        org.jeecg.common.util.MinioUtil.getBucketName(), t.getAudioUrl(), 3600));
+                return item;
+            }).collect(Collectors.toList());
+            data.put("items", urls);
+        }
+
+        return Result.OK(data);
+    }
+
+    @Operation(summary = "通话标签列表")
+    @GetMapping("/calls/{callSessionId}/tags")
+    public Result<JSONObject> getCallTags(@PathVariable String callSessionId) {
+        List<CallTag> tags = callTagMapper.selectList(
+                new LambdaQueryWrapper<CallTag>().eq(CallTag::getSessionId, callSessionId));
+
+        List<JSONObject> items = tags.stream().map(t -> {
+            JSONObject item = new JSONObject();
+            item.put("id", t.getId());
+            item.put("tag_name", t.getTagName());
+            item.put("source", t.getSource());
+            item.put("confidence", t.getConfidence());
+            return item;
+        }).collect(Collectors.toList());
+
+        JSONObject result = new JSONObject();
+        result.put("items", items);
+        return Result.OK(result);
+    }
 }
