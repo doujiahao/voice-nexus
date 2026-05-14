@@ -148,14 +148,21 @@ public class CallWebSocket {
         sendMessage(agentUserId, msg.toJSONString());
     }
 
-    public static void pushAsrResult(String agentUserId, String correctedText, String speakerRole, String speakerName, String intent) {
+    public static void pushAsrResult(String agentUserId, String correctedText, String speakerRole,
+                                      String speakerName, String intent, String turnId, Integer durationMs) {
         JSONObject msg = new JSONObject();
         msg.put("type", "asr_result");
+        msg.put("text", correctedText);
         msg.put("corrected_text", correctedText);
+        msg.put("role", speakerRole);
         msg.put("speaker_role", speakerRole);
+        msg.put("speakerName", speakerName);
         msg.put("speaker_name", speakerName);
         msg.put("ts", java.time.Instant.now().toString());
+        msg.put("timestamp", System.currentTimeMillis());
         if (intent != null) msg.put("intent", intent);
+        if (turnId != null) msg.put("turnId", turnId);
+        if (durationMs != null) msg.put("durationMs", durationMs);
         sendMessage(agentUserId, msg.toJSONString());
     }
 

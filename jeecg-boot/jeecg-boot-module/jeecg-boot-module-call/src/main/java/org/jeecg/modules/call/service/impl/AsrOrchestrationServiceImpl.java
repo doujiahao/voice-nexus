@@ -136,7 +136,9 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
                 turn.getCorrectedText() != null ? turn.getCorrectedText() : turn.getText(),
                 turn.getSpeakerRole(),
                 data.getString("speaker_name"),
-                turn.getIntent()
+                turn.getIntent(),
+                turn.getId(),
+                turn.getDurationMs()
         );
     }
 

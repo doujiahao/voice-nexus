@@ -35,6 +35,8 @@ public class CallController {
     private CallTagMapper callTagMapper;
     @Autowired
     private CustomerMapper customerMapper;
+    @Autowired
+    private AgentProfileMapper agentProfileMapper;
 
     @Operation(summary = "获取坐席信息")
     @GetMapping("/agent/info")
@@ -77,10 +79,25 @@ public class CallController {
             item.put("phone", s.getCustomerPhone());
             item.put("status", s.getStatus());
             item.put("agent_id", s.getAgentId());
-            // 查客户名
             if (s.getCustomerId() != null) {
                 Customer c = customerMapper.selectById(s.getCustomerId());
                 if (c != null) item.put("customer_name", c.getName());
+            }
+            if (s.getAgentId() != null) {
+                AgentProfile agent = agentProfileMapper.selectById(s.getAgentId());
+                if (agent != null) item.put("agent_name", agent.getAgentNo());
+            }
+            Long turnCount = callTurnMapper.selectCount(
+                    new LambdaQueryWrapper<CallTurn>().eq(CallTurn::getSessionId, s.getId()));
+            item.put("turn_count", turnCount);
+            if (s.getSummary() != null && !s.getSummary().isEmpty()) {
+                try {
+                    JSONObject summary = com.alibaba.fastjson.JSON.parseObject(s.getSummary());
+                    String intent = summary.getString("customer_intent");
+                    item.put("summary_short", intent != null ? intent : "");
+                } catch (Exception ignored) {
+                    item.put("summary_short", "");
+                }
             }
             return item;
         }).collect(Collectors.toList());
