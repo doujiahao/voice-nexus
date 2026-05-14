@@ -3,22 +3,24 @@ package org.jeecg.modules.call.ws;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import jakarta.websocket.*;
-import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.RedisUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Slf4j
-@ServerEndpoint("/call/ws/{userId}")
+@ServerEndpoint("/call/ws")
 public class CallWebSocket {
 
     private static final ConcurrentHashMap<String, Session> SESSION_POOL = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Session, String> SESSION_USER_MAP = new ConcurrentHashMap<>();
     private static final String REDIS_WS_PREFIX = "call:ws:conn:";
 
     private static RedisUtil redisUtil;
@@ -29,23 +31,37 @@ public class CallWebSocket {
     }
 
     @OnOpen
-    public void onOpen(Session session, @PathParam("userId") String userId) {
+    public void onOpen(Session session) {
+        String userId = resolveUserId(session);
+        if (userId == null) {
+            try {
+                session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "token invalid"));
+            } catch (IOException ignored) {}
+            return;
+        }
         SESSION_POOL.put(userId, session);
+        SESSION_USER_MAP.put(session, userId);
         redisUtil.set(REDIS_WS_PREFIX + userId, "1");
-        log.info("【话务WS】连接建立: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
+        log.info("[CallWS] 连接建立: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
         sendMessage(userId, "{\"type\":\"connected\",\"userId\":\"" + userId + "\"}");
     }
 
     @OnClose
-    public void onClose(@PathParam("userId") String userId) {
-        SESSION_POOL.remove(userId);
-        redisUtil.del(REDIS_WS_PREFIX + userId);
-        log.info("【话务WS】连接断开: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
+    public void onClose(Session session) {
+        String userId = SESSION_USER_MAP.remove(session);
+        if (userId != null) {
+            SESSION_POOL.remove(userId);
+            redisUtil.del(REDIS_WS_PREFIX + userId);
+            log.info("[CallWS] 连接断开: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
+        }
     }
 
     @OnMessage
-    public void onMessage(String message, @PathParam("userId") String userId) {
-        log.debug("【话务WS】收到消息: userId={}, msg={}", userId, message);
+    public void onMessage(String message, Session session) {
+        String userId = SESSION_USER_MAP.get(session);
+        if (userId == null) return;
+
+        log.debug("[CallWS] 收到消息: userId={}, msg={}", userId, message);
         try {
             JSONObject msg = JSON.parseObject(message);
             String type = msg.getString("type");
@@ -60,15 +76,34 @@ public class CallWebSocket {
 
             CallWsMessageHandler.handle(userId, msg);
         } catch (Exception e) {
-            log.error("【话务WS】消息处理异常: userId={}", userId, e);
+            log.error("[CallWS] 消息处理异常: userId={}", userId, e);
         }
     }
 
     @OnError
-    public void onError(Session session, Throwable error, @PathParam("userId") String userId) {
-        log.error("【话务WS】连接异常: userId={}", userId, error);
-        SESSION_POOL.remove(userId);
-        redisUtil.del(REDIS_WS_PREFIX + userId);
+    public void onError(Session session, Throwable error) {
+        String userId = SESSION_USER_MAP.remove(session);
+        if (userId != null) {
+            SESSION_POOL.remove(userId);
+            redisUtil.del(REDIS_WS_PREFIX + userId);
+            log.error("[CallWS] 连接异常: userId={}", userId, error);
+        }
+    }
+
+    private String resolveUserId(Session session) {
+        URI uri = session.getRequestURI();
+        if (uri == null) return null;
+        String query = uri.getQuery();
+        if (query == null) return null;
+        for (String param : query.split("&")) {
+            String[] kv = param.split("=", 2);
+            if (kv.length == 2 && "token".equals(kv[0])) {
+                String token = java.net.URLDecoder.decode(kv[1], java.nio.charset.StandardCharsets.UTF_8);
+                String username = JwtUtil.getUsername(token);
+                return username;
+            }
+        }
+        return null;
     }
 
     public static void sendMessage(String userId, String message) {
@@ -77,7 +112,7 @@ public class CallWebSocket {
             try {
                 session.getBasicRemote().sendText(message);
             } catch (IOException e) {
-                log.error("【话务WS】发送消息失败: userId={}", userId, e);
+                log.error("[CallWS] 发送消息失败: userId={}", userId, e);
             }
         }
     }
