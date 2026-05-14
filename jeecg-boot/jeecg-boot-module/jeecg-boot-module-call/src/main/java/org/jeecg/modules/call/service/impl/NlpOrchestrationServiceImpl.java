@@ -99,6 +99,8 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         msg.put("recommended_questions", data.getJSONArray("recommended_questions"));
         msg.put("decision_suggestions", data.getJSONArray("decision_suggestions"));
         msg.put("suggested_reply", data.getString("suggested_reply"));
+        msg.put("suggested_followup_questions", data.getJSONArray("suggested_followup_questions"));
+        msg.put("task_suggestion", data.getJSONObject("task_suggestion"));
         CallWebSocket.sendMessage(session.getAgentId(), msg.toJSONString());
     }
 
