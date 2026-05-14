@@ -247,4 +247,23 @@ public class CallController {
         result.put("items", items);
         return Result.OK(result);
     }
+
+    @Operation(summary = "手动添加通话标签")
+    @PostMapping("/calls/{callSessionId}/tags")
+    public Result<CallTag> addTag(@PathVariable String callSessionId, @RequestBody JSONObject body) {
+        CallTag tag = new CallTag();
+        tag.setSessionId(callSessionId);
+        tag.setTagName(body.getString("tag_name"));
+        tag.setSource("MANUAL");
+        tag.setCreateTime(new Date());
+        callTagMapper.insert(tag);
+        return Result.OK(tag);
+    }
+
+    @Operation(summary = "删除通话标签")
+    @DeleteMapping("/calls/{callSessionId}/tags/{tagId}")
+    public Result<?> deleteTag(@PathVariable String callSessionId, @PathVariable String tagId) {
+        callTagMapper.deleteById(tagId);
+        return Result.OK("删除成功");
+    }
 }
