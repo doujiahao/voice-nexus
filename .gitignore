@@ -33,3 +33,17 @@ derby.log
 # AI 临时草稿文件（会话结束前必须升级或删除）
 *.draft.md
 *.tmp.md
+/other/
+/JeecgBoot-main/.claude/
+/.agents/skills/zentao-api/scripts/get-token.sh
+/.agents/skills/zentao-api/api-reference.md
+/.agents/skills/zentao-api/SKILL.md
+/.agents/skills/zentao-cli/SKILL.md
+/.agents/skills/zentao-tour/roles/dev.md
+/.agents/skills/zentao-tour/roles/executive.md
+/.agents/skills/zentao-tour/roles/pjm.md
+/.agents/skills/zentao-tour/roles/pm.md
+/.agents/skills/zentao-tour/roles/test.md
+/.agents/skills/zentao-tour/overview.md
+/.agents/skills/zentao-tour/SKILL.md
+/skills-lock.json
