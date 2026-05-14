@@ -32,6 +32,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     private AgentProfileMapper agentProfileMapper;
     @Autowired
     private IAgentProfileService agentProfileService;
+    @Autowired
+    private CallEndProcessor callEndProcessor;
 
     @Override
     public CallSession getByFsCallId(String fsCallId) {
@@ -118,5 +120,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
             }
         }
+
+        callEndProcessor.processCallEnd(session.getId());
     }
 }
