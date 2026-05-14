@@ -277,7 +277,7 @@ jeecg:
   # 话务平台配置
   call:
     internal:
-      secret-key: ${CALL_INTERNAL_SECRET_KEY:changeme-internal-key}
+      secret-key: ${CALL_INTERNAL_SECRET_KEY:btmo2zaoSdHXZTLPLSpy53PqDPg3DQ1E}
     gateway:
       base-url: ${CALL_GATEWAY_URL:http://192.168.1.21:30001}
   #大屏报表参数设置
