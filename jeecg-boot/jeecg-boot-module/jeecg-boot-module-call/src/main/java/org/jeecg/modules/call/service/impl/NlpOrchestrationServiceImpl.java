@@ -77,7 +77,7 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
             return null;
         }
 
-        String url = callProperties.getGateway().getBaseUrl() + "/api/v1/nlp/session-summary";
+        String url = callProperties.getGateway().getBaseUrl() + "/api/v1/nlp/conversation-summary";
 
         JSONObject body = new JSONObject();
         body.put("session_id", sessionId);
