@@ -200,11 +200,11 @@ jeecg:
     # AI流程敏感节点(stdio=命令行节点, sql=SQL节点)
     allow-sensitive-nodes: sql,stdio
     embed-store:
-      host: 127.0.0.1
-      port: 5432
-      database: postgres
-      user: postgres
-      password: postgres
+      host: 192.168.1.22
+      port: 18138
+      database: voice_nexus
+      user: qjwy
+      password: qjwy2061
       table: embeddings
   #  Unipush配置 云函数调用 URL 化地址
   unicloud:
