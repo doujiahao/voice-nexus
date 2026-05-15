@@ -163,7 +163,7 @@
 - [ ] 技能组 CRUD 接口
 - [ ] 技能组-坐席分配接口
 - [ ] 管理员坐席列表/状态查询接口
-- [ ] JeecgBoot 菜单权限数据初始化 SQL
+- [x] JeecgBoot 菜单权限数据初始化 SQL
 
 **Dependencies**: Task 1, Task 2
 
