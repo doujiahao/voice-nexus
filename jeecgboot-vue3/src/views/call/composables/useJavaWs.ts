@@ -107,6 +107,7 @@ function _doConnect(): void {
     const sep = connectUrl.includes('?') ? '&' : '?'
     connectUrl = `${connectUrl}${sep}token=${encodeURIComponent(_token)}`
   }
+  console.info(`${TAG} 正在连接:`, connectUrl)
   const ws = new WebSocket(connectUrl)
   _ws = ws
 
@@ -129,6 +130,7 @@ function _doConnect(): void {
     try {
       const payload = JSON.parse(ev.data) as JavaWsPayload
       if (payload.type === 'pong') return
+      console.info(`${TAG} 收到消息:`, payload)
       if (payload.type === 'connected') {
         console.info(`${TAG} 服务端确认连接, userId:`, (payload as any).userId)
         return

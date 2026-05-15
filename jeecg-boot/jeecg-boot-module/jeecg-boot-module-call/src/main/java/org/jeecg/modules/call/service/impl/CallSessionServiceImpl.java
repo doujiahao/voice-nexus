@@ -48,10 +48,13 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         Map<String, Object> result = new HashMap<>();
 
         if (session == null) {
+            log.warn("[Inbound] 通话事件找不到会话: fsCallId={}, eventType={}", fsCallId, event.getEventType());
             result.put("acknowledged", false);
             result.put("error", "Session not found for fs_call_id: " + fsCallId);
             return result;
         }
+        log.info("[Inbound] 通话事件匹配会话: fsCallId={}, sessionId={}, currentStatus={}, eventType={}",
+                fsCallId, session.getId(), session.getStatus(), event.getEventType());
 
         // 记录事件日志
         CallEventLog eventLog = new CallEventLog();

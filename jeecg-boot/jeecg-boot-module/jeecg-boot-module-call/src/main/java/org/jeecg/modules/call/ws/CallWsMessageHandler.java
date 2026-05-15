@@ -37,6 +37,7 @@ public class CallWsMessageHandler {
 
     public static void handle(String userId, JSONObject msg) {
         String type = msg.getString("type");
+        log.info("[CallWS] 处理客户端消息: userId={}, type={}, msg={}", userId, type, msg);
 
         switch (type) {
             case "call_response":

@@ -48,10 +48,16 @@ public class CallWebSocket {
             } catch (IOException ignored) {}
             return;
         }
-        SESSION_POOL.put(userId, session);
+        Session oldSession = SESSION_POOL.put(userId, session);
+        if (oldSession != null && oldSession.isOpen() && oldSession != session) {
+            try {
+                oldSession.close(new CloseReason(CloseReason.CloseCodes.NORMAL_CLOSURE, "new connection opened"));
+            } catch (IOException ignored) {}
+        }
         SESSION_USER_MAP.put(session, userId);
         redisUtil.set(REDIS_WS_PREFIX + userId, "1");
-        log.info("[CallWS] 连接建立: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
+        log.info("[CallWS] 连接建立: userId={}, sessionId={}, query={}, 当前连接数={}",
+                userId, session.getId(), session.getQueryString(), SESSION_POOL.size());
         sendMessage(userId, "{\"type\":\"connected\",\"userId\":\"" + userId + "\"}");
     }
 
@@ -129,7 +135,9 @@ public class CallWebSocket {
                 log.warn("[CallWS] token 用户不存在: username={}", username);
                 return null;
             }
-            return users.get(0).getId();
+            String userId = users.get(0).getId();
+            log.info("[CallWS] token 用户映射成功: username={}, userId={}", username, userId);
+            return userId;
         } catch (Exception e) {
             log.warn("[CallWS] token 用户查询失败: username={}", username, e);
             return null;
@@ -139,17 +147,22 @@ public class CallWebSocket {
     public static void sendMessage(String userId, String message) {
         Session session = SESSION_POOL.get(userId);
         if (session == null || !session.isOpen()) {
-            log.warn("[CallWS] 发送消息跳过，用户 WS 不在线: userId={}, msg={}", userId, message);
+            log.warn("[CallWS] 发送消息跳过，用户 WS 不在线: userId={}, onlineUsers={}, msg={}", userId, SESSION_POOL.keySet(), message);
             return;
         }
         try {
             session.getBasicRemote().sendText(message);
+            if (!message.contains("\"type\":\"pong\"")) {
+                log.info("[CallWS] 消息发送成功: userId={}, msg={}", userId, message);
+            }
         } catch (IOException e) {
             log.error("[CallWS] 发送消息失败: userId={}", userId, e);
         }
     }
 
     public static void pushIncomingCall(String agentUserId, String callId, String phone, String callerName, String fsCallId) {
+        log.info("[CallWS] 推送来电: agentUserId={}, callId={}, phone={}, callerName={}, fsCallId={}, online={}",
+                agentUserId, callId, phone, callerName, fsCallId, isOnline(agentUserId));
         JSONObject msg = new JSONObject();
         msg.put("type", "incoming_call");
         msg.put("call_id", callId);

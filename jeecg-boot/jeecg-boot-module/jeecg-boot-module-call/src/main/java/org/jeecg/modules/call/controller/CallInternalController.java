@@ -30,8 +30,13 @@ public class CallInternalController {
     @PostMapping("/calls/{fsCallId}/route")
     public RouteResponseDTO route(@PathVariable String fsCallId,
                                   @RequestBody RouteRequestDTO request) {
-        log.info("呼入路由申请: fsCallId={}, phone={}", fsCallId, request.getCustomerPhone());
-        return callRouteService.route(fsCallId, request);
+        log.info("[Inbound] 收到路由申请: fsCallId={}, customerPhone={}, calledNumber={}, skillGroup={}, metadata={}",
+                fsCallId, request.getCustomerPhone(), request.getCalledNumber(), request.getSkillGroup(), request.getFsMetadata());
+        RouteResponseDTO response = callRouteService.route(fsCallId, request);
+        log.info("[Inbound] 路由响应: fsCallId={}, success={}, action={}, sessionId={}, targetAgentId={}, targetExtension={}, errorCode={}, message={}",
+                fsCallId, response.isSuccess(), response.getRouteAction(), response.getCallSessionId(),
+                response.getTargetAgentId(), response.getTargetExtension(), response.getErrorCode(), response.getMessage());
+        return response;
     }
 
     @IgnoreAuth
@@ -39,7 +44,10 @@ public class CallInternalController {
     @PostMapping("/calls/{fsCallId}/events")
     public Map<String, Object> reportEvent(@PathVariable String fsCallId,
                                            @RequestBody CallEventDTO event) {
-        log.info("通话事件上报: fsCallId={}, type={}", fsCallId, event.getEventType());
-        return callSessionService.handleEvent(fsCallId, event);
+        log.info("[Inbound] 收到通话事件: fsCallId={}, type={}, endedBy={}, durationSec={}, metadata={}",
+                fsCallId, event.getEventType(), event.getEndedBy(), event.getDurationSec(), event.getMetadata());
+        Map<String, Object> response = callSessionService.handleEvent(fsCallId, event);
+        log.info("[Inbound] 通话事件响应: fsCallId={}, response={}", fsCallId, response);
+        return response;
     }
 }
