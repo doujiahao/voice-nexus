@@ -22,7 +22,7 @@
 **Description**: 基于 JeecgBoot 用户体系扩展坐席角色，实现坐席状态管理。
 
 **Deliverables**:
-- [ ] 坐席角色定义与菜单权限配置
+- [x] 坐席角色定义与菜单权限配置
 - [ ] 内部服务认证（X-Internal-Key 校验拦截器）
 - [ ] 坐席状态枚举（OFFLINE / ONLINE / REST / RINGING / TALKING / HOLDING / WRAP_UP）
 - [ ] 状态切换 Service + Controller
