@@ -5,13 +5,16 @@ import com.alibaba.fastjson.JSONObject;
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.common.system.api.ISysBaseAPI;
 import org.jeecg.common.system.util.JwtUtil;
+import org.jeecg.common.system.vo.UserAccountInfo;
 import org.jeecg.common.util.RedisUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -24,10 +27,16 @@ public class CallWebSocket {
     private static final String REDIS_WS_PREFIX = "call:ws:conn:";
 
     private static RedisUtil redisUtil;
+    private static ISysBaseAPI sysBaseAPI;
 
     @Autowired
     private void setRedisUtil(RedisUtil redisUtil) {
         CallWebSocket.redisUtil = redisUtil;
+    }
+
+    @Autowired
+    private void setSysBaseAPI(ISysBaseAPI sysBaseAPI) {
+        CallWebSocket.sysBaseAPI = sysBaseAPI;
     }
 
     @OnOpen
@@ -100,10 +109,31 @@ public class CallWebSocket {
             if (kv.length == 2 && "token".equals(kv[0])) {
                 String token = java.net.URLDecoder.decode(kv[1], java.nio.charset.StandardCharsets.UTF_8);
                 String username = JwtUtil.getUsername(token);
-                return username;
+                return resolveUserIdByUsername(username);
             }
         }
         return null;
+    }
+
+    private String resolveUserIdByUsername(String username) {
+        if (username == null) {
+            return null;
+        }
+        if (sysBaseAPI == null) {
+            log.warn("[CallWS] 系统用户查询接口未初始化: username={}", username);
+            return null;
+        }
+        try {
+            List<UserAccountInfo> users = sysBaseAPI.queryUserByNames(new String[]{username});
+            if (users == null || users.isEmpty()) {
+                log.warn("[CallWS] token 用户不存在: username={}", username);
+                return null;
+            }
+            return users.get(0).getId();
+        } catch (Exception e) {
+            log.warn("[CallWS] token 用户查询失败: username={}", username, e);
+            return null;
+        }
     }
 
     public static void sendMessage(String userId, String message) {

@@ -124,7 +124,7 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         CallSession session = callSessionMapper.selectById(sessionId);
         pushToFrontend(session, turn, data);
 
-        if (session != null) {
+        if (session != null && "customer".equalsIgnoreCase(speakerRole)) {
             nlpOrchestrationService.analyzeAgentAssist(session, turn.getId());
         }
     }

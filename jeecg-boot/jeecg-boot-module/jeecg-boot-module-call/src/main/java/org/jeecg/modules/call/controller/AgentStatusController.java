@@ -1,5 +1,7 @@
 package org.jeecg.modules.call.controller;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +33,22 @@ public class AgentStatusController {
 
     @Operation(summary = "变更坐席状态")
     @PostMapping("/status")
-    public Result<String> changeStatus(@RequestParam String status,
-                                       @RequestParam(required = false) String reason) {
+    public Result<String> changeStatus(@RequestParam(required = false) String status,
+                                       @RequestParam(required = false) String reason,
+                                       @RequestBody(required = false) String body) {
+        if (body != null && body.trim().startsWith("{")) {
+            JSONObject json = JSON.parseObject(body);
+            if (status == null) {
+                status = json.getString("status");
+            }
+            if (reason == null) {
+                reason = json.getString("reason");
+            }
+        }
+        if (status == null) {
+            return Result.error("缺少坐席状态 status");
+        }
+
         LoginUser user = (LoginUser) SecurityUtils.getSubject().getPrincipal();
         AgentStatusEnum newStatus = AgentStatusEnum.fromCode(status);
         agentProfileService.changeStatus(user.getId(), newStatus, reason);
