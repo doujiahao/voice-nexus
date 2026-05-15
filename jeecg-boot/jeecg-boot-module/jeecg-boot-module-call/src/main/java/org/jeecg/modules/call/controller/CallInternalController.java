@@ -32,6 +32,8 @@ public class CallInternalController {
                                   @RequestBody RouteRequestDTO request) {
         log.info("[Inbound] 收到路由申请: fsCallId={}, customerPhone={}, calledNumber={}, skillGroup={}, metadata={}",
                 fsCallId, request.getCustomerPhone(), request.getCalledNumber(), request.getSkillGroup(), request.getFsMetadata());
+        log.info("[Inbound] 开始路由处理: fsCallId={}, caller={}, callee={}, request={}",
+                fsCallId, request.getCustomerPhone(), request.getCalledNumber(), request);
         RouteResponseDTO response = callRouteService.route(fsCallId, request);
         log.info("[Inbound] 路由响应: fsCallId={}, success={}, action={}, sessionId={}, targetAgentId={}, targetExtension={}, errorCode={}, message={}",
                 fsCallId, response.isSuccess(), response.getRouteAction(), response.getCallSessionId(),

@@ -49,15 +49,21 @@ public class CallWebSocket {
             return;
         }
         Session oldSession = SESSION_POOL.put(userId, session);
-        if (oldSession != null && oldSession.isOpen() && oldSession != session) {
-            try {
-                oldSession.close(new CloseReason(CloseReason.CloseCodes.NORMAL_CLOSURE, "new connection opened"));
-            } catch (IOException ignored) {}
-        }
         SESSION_USER_MAP.put(session, userId);
         redisUtil.set(REDIS_WS_PREFIX + userId, "1");
-        log.info("[CallWS] 连接建立: userId={}, sessionId={}, query={}, 当前连接数={}",
-                userId, session.getId(), session.getQueryString(), SESSION_POOL.size());
+        log.info("[CallWS] 连接建立: userId={}, sessionId={}, query={}, oldSessionId={}, 当前连接数={}, onlineUsers={}",
+                userId, session.getId(), session.getQueryString(), oldSession != null ? oldSession.getId() : null,
+                SESSION_POOL.size(), SESSION_POOL.keySet());
+        if (oldSession != null && oldSession.isOpen() && oldSession != session) {
+            try {
+                log.info("[CallWS] 关闭同用户旧连接: userId={}, oldSessionId={}, newSessionId={}",
+                        userId, oldSession.getId(), session.getId());
+                oldSession.close(new CloseReason(CloseReason.CloseCodes.NORMAL_CLOSURE, "new connection opened"));
+            } catch (IOException e) {
+                log.warn("[CallWS] 关闭同用户旧连接失败: userId={}, oldSessionId={}, newSessionId={}",
+                        userId, oldSession.getId(), session.getId(), e);
+            }
+        }
         sendMessage(userId, "{\"type\":\"connected\",\"userId\":\"" + userId + "\"}");
     }
 
@@ -65,9 +71,12 @@ public class CallWebSocket {
     public void onClose(Session session) {
         String userId = SESSION_USER_MAP.remove(session);
         if (userId != null) {
-            SESSION_POOL.remove(userId);
-            redisUtil.del(REDIS_WS_PREFIX + userId);
-            log.info("[CallWS] 连接断开: userId={}, 当前连接数={}", userId, SESSION_POOL.size());
+            boolean removed = SESSION_POOL.remove(userId, session);
+            if (removed) {
+                redisUtil.del(REDIS_WS_PREFIX + userId);
+            }
+            log.info("[CallWS] 连接断开: userId={}, sessionId={}, removedCurrent={}, 当前连接数={}, onlineUsers={}",
+                    userId, session.getId(), removed, SESSION_POOL.size(), SESSION_POOL.keySet());
         }
     }
 
@@ -99,9 +108,12 @@ public class CallWebSocket {
     public void onError(Session session, Throwable error) {
         String userId = SESSION_USER_MAP.remove(session);
         if (userId != null) {
-            SESSION_POOL.remove(userId);
-            redisUtil.del(REDIS_WS_PREFIX + userId);
-            log.error("[CallWS] 连接异常: userId={}", userId, error);
+            boolean removed = SESSION_POOL.remove(userId, session);
+            if (removed) {
+                redisUtil.del(REDIS_WS_PREFIX + userId);
+            }
+            log.error("[CallWS] 连接异常: userId={}, sessionId={}, removedCurrent={}, 当前连接数={}, onlineUsers={}",
+                    userId, session.getId(), removed, SESSION_POOL.size(), SESSION_POOL.keySet(), error);
         }
     }
 
@@ -147,22 +159,26 @@ public class CallWebSocket {
     public static void sendMessage(String userId, String message) {
         Session session = SESSION_POOL.get(userId);
         if (session == null || !session.isOpen()) {
-            log.warn("[CallWS] 发送消息跳过，用户 WS 不在线: userId={}, onlineUsers={}, msg={}", userId, SESSION_POOL.keySet(), message);
+            log.warn("[CallWS] 发送消息跳过，用户 WS 不在线: userId={}, hasSession={}, sessionOpen={}, onlineUsers={}, msg={}",
+                    userId, session != null, session != null && session.isOpen(), SESSION_POOL.keySet(), message);
             return;
         }
         try {
+            log.info("[CallWS] 准备发送消息: userId={}, sessionId={}, msg={}", userId, session.getId(), message);
             session.getBasicRemote().sendText(message);
             if (!message.contains("\"type\":\"pong\"")) {
-                log.info("[CallWS] 消息发送成功: userId={}, msg={}", userId, message);
+                log.info("[CallWS] 消息发送成功: userId={}, sessionId={}, msg={}", userId, session.getId(), message);
             }
         } catch (IOException e) {
-            log.error("[CallWS] 发送消息失败: userId={}", userId, e);
+            log.error("[CallWS] 发送消息失败: userId={}, sessionId={}, msg={}", userId, session.getId(), message, e);
         }
     }
 
     public static void pushIncomingCall(String agentUserId, String callId, String phone, String callerName, String fsCallId) {
-        log.info("[CallWS] 推送来电: agentUserId={}, callId={}, phone={}, callerName={}, fsCallId={}, online={}",
-                agentUserId, callId, phone, callerName, fsCallId, isOnline(agentUserId));
+        Session session = SESSION_POOL.get(agentUserId);
+        log.info("[CallWS] 推送来电开始: agentUserId={}, callId={}, phone={}, callerName={}, fsCallId={}, online={}, sessionId={}, onlineUsers={}",
+                agentUserId, callId, phone, callerName, fsCallId, session != null && session.isOpen(),
+                session != null ? session.getId() : null, SESSION_POOL.keySet());
         JSONObject msg = new JSONObject();
         msg.put("type", "incoming_call");
         msg.put("call_id", callId);
@@ -170,6 +186,7 @@ public class CallWebSocket {
         msg.put("caller_name", callerName);
         msg.put("fs_call_id", fsCallId);
         sendMessage(agentUserId, msg.toJSONString());
+        log.info("[CallWS] 推送来电结束: agentUserId={}, callId={}, fsCallId={}", agentUserId, callId, fsCallId);
     }
 
     public static void pushCallSession(String agentUserId, String callSessionId) {
