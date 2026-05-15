@@ -10,6 +10,7 @@ import org.jeecg.modules.call.mapper.*;
 import org.jeecg.modules.call.service.IAgentProfileService;
 import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallRouteService;
+import org.jeecg.modules.call.ws.CallWebSocket;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -101,6 +102,12 @@ public class CallRouteServiceImpl implements ICallRouteService {
             callSessionMapper.updateById(session);
 
             agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
+            CallWebSocket.pushIncomingCall(
+                    agent.getUserId(),
+                    session.getId(),
+                    request.getCustomerPhone(),
+                    customer != null ? customer.getName() : null,
+                    fsCallId);
 
             // 7. 构建响应
             RouteResponseDTO resp = new RouteResponseDTO();
