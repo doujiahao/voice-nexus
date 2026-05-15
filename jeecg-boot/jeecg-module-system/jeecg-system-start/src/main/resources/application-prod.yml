@@ -119,7 +119,7 @@ spring:
         # 初始化大小，最小，最大
         initial-size: 5
         min-idle: 5
-        maxActive: 1000
+        maxActive: 30
         # 配置获取连接等待超时的时间
         maxWait: 60000
         # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
@@ -187,6 +187,10 @@ jeecg:
       secret-key: ${CALL_INTERNAL_SECRET_KEY:changeme-internal-key}
     gateway:
       base-url: ${CALL_GATEWAY_URL:http://192.168.1.21:30001}
+    freeswitch:
+      base-url: ${CALL_FREESWITCH_URL:http://172.16.16.70:8080}
+    rtmp:
+      base-url: ${CALL_RTMP_URL:rtmp://172.16.16.70:41300/live}
   # AI集成
   ai-chat:
     enabled: true

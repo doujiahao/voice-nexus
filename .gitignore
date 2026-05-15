@@ -50,3 +50,6 @@ derby.log
 /.agents/skills/zentao-tour/overview.md
 /.agents/skills/zentao-tour/SKILL.md
 /skills-lock.json
+/log/error-log.html
+/log/jeecgboot-2026-05-15.0.html
+/log/jeecgboot-2026-05-15.0.log
