@@ -147,7 +147,14 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         turnCtx.put("speaker_name", speakerName);
         turnCtx.put("corrected_text", turn.getCorrectedText() != null ? turn.getCorrectedText() : turn.getText());
         turnCtx.put("intent", turn.getIntent());
+        turnCtx.put("intent_confidence", data.getDouble("intent_confidence"));
+        turnCtx.put("keywords", data.getJSONArray("keywords"));
+        turnCtx.put("entities", data.getJSONObject("entities"));
         turnCtx.put("emotion", turn.getEmotion());
+        turnCtx.put("utterance_summary", data.getString("utterance_summary"));
+        turnCtx.put("need_clarify", data.getBoolean("need_clarify"));
+        turnCtx.put("domain", data.getString("domain"));
+        turnCtx.put("domain_confidence", data.getDouble("domain_confidence"));
         callContextService.appendTurn(sessionId, turnCtx);
 
         CallSession session = callSessionMapper.selectById(sessionId);
@@ -174,7 +181,13 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
                 data.getString("speaker_name"),
                 turn.getIntent(),
                 turn.getId(),
-                turn.getDurationMs()
+                turn.getDurationMs(),
+                data.getDouble("intent_confidence"),
+                data.getJSONArray("keywords"),
+                data.getJSONObject("entities"),
+                turn.getEmotion(),
+                data.getString("utterance_summary"),
+                data.getBoolean("need_clarify")
         );
     }
 

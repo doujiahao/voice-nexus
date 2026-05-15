@@ -34,6 +34,12 @@
           <div v-if="msg.intent" class="tp-bubble intent-bubble">
             <span class="intent-label">意图</span>{{ msg.intent }}
           </div>
+          <div v-if="entityEntries(msg).length" class="tp-bubble entity-bubble">
+            <span class="entity-title">实体</span>
+            <span v-for="([key, value]) in entityEntries(msg)" :key="key" class="entity-tag">
+              {{ entityLabel(key) }}：{{ value }}
+            </span>
+          </div>
           <div class="tp-timestamp agent-ts">{{ msg.time }}</div>
         </div>
         <div class="tp-avatar agent-avatar">客</div>
@@ -55,6 +61,12 @@
           </div>
           <div v-if="msg.intent" class="tp-bubble intent-bubble intent-bubble--user">
             <span class="intent-label">意图</span>{{ msg.intent }}
+          </div>
+          <div v-if="entityEntries(msg).length" class="tp-bubble entity-bubble">
+            <span class="entity-title">实体</span>
+            <span v-for="([key, value]) in entityEntries(msg)" :key="key" class="entity-tag">
+              {{ entityLabel(key) }}：{{ value }}
+            </span>
           </div>
           <div class="tp-timestamp user-ts">{{ msg.time }}</div>
         </div>
@@ -137,6 +149,23 @@ onMounted(() => scrollToBottom(true))
 
 function userInitial(name?: string): string {
   return name ? name.charAt(0) : '用'
+}
+
+const entityLabels: Record<string, string> = {
+  address: '地址',
+  phone: '电话',
+  customer_name: '姓名',
+  fault_detail: '故障',
+  account_no: '户号',
+  meter_no: '表号',
+}
+
+function entityLabel(key: string): string {
+  return entityLabels[key] ?? key
+}
+
+function entityEntries(msg: ChatMessage): [string, string][] {
+  return Object.entries(msg.entities ?? {}).filter(([, value]) => String(value ?? '').trim())
 }
 
 function onScroll(): void {
@@ -251,6 +280,13 @@ function scrollToBottom(force = false): void {
 }
 .intent-bubble--user { align-self: flex-start; }
 .intent-label { background: #f97316; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
+.entity-bubble {
+  background: #f8fafc; color: #334155; border: 1px solid #cbd5e1;
+  border-radius: 8px; font-size: 12px;
+  padding: 6px 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; box-shadow: none;
+}
+.entity-title { color: #475569; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.entity-tag { background: #e2e8f0; color: #334155; border-radius: 999px; padding: 1px 7px; }
 
 /* ── 时间戳 ── */
 .tp-timestamp { font-size: 10px; color: #94a3b8; line-height: 1; padding: 0 2px; }

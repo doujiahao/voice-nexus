@@ -170,6 +170,7 @@ public class CallController {
             item.put("duration_ms", t.getDurationMs());
             item.put("audio_url", t.getAudioUrl());
             item.put("intent", t.getIntent());
+            item.put("entities", t.getEntities() != null ? JSONObject.parseObject(t.getEntities()) : new JSONObject());
             item.put("emotion", t.getEmotion());
             item.put("ts", t.getStartTime());
             return item;

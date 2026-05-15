@@ -31,6 +31,11 @@ export interface ChatMessage {
   content: string
   name?: string
   intent?: string
+  intentConfidence?: number
+  keywords?: string[]
+  entities?: Record<string, string>
+  emotion?: string
+  utteranceSummary?: string
   audioUrl?: string
   durationMs?: number
 }
@@ -160,6 +165,11 @@ export interface AsrResult {
   durationMs?: number
   method?: string
   intent?: IntentResult
+  intentConfidence?: number
+  keywords?: string[]
+  entities?: Record<string, string>
+  emotion?: string
+  utteranceSummary?: string
   timestamp: number
 }
 

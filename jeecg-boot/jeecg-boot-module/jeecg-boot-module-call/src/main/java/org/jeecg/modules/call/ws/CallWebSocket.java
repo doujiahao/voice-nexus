@@ -1,6 +1,7 @@
 package org.jeecg.modules.call.ws;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
@@ -211,7 +212,9 @@ public class CallWebSocket {
     }
 
     public static void pushAsrResult(String agentUserId, String correctedText, String speakerRole,
-                                      String speakerName, String intent, String turnId, Integer durationMs) {
+                                      String speakerName, String intent, String turnId, Integer durationMs,
+                                      Double intentConfidence, JSONArray keywords, JSONObject entities,
+                                      String emotion, String utteranceSummary, Boolean needClarify) {
         JSONObject msg = new JSONObject();
         msg.put("type", "asr_result");
         msg.put("text", correctedText);
@@ -223,6 +226,12 @@ public class CallWebSocket {
         msg.put("ts", java.time.Instant.now().toString());
         msg.put("timestamp", System.currentTimeMillis());
         if (intent != null) msg.put("intent", intent);
+        if (intentConfidence != null) msg.put("intent_confidence", intentConfidence);
+        if (keywords != null) msg.put("keywords", keywords);
+        if (entities != null) msg.put("entities", entities);
+        if (emotion != null) msg.put("emotion", emotion);
+        if (utteranceSummary != null) msg.put("utterance_summary", utteranceSummary);
+        if (needClarify != null) msg.put("need_clarify", needClarify);
         if (turnId != null) msg.put("turnId", turnId);
         if (durationMs != null) msg.put("durationMs", durationMs);
         sendMessage(agentUserId, msg.toJSONString());

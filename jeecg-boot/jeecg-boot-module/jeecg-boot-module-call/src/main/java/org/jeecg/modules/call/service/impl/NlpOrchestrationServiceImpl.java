@@ -102,7 +102,11 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         msg.put("type", "agent_assist");
         msg.put("call_session_id", session.getId());
         msg.put("current_intent", data.getString("current_intent"));
+        msg.put("intent_confidence", data.getDouble("intent_confidence"));
+        msg.put("keywords", data.getJSONArray("keywords"));
+        msg.put("entities", data.getJSONObject("entities"));
         msg.put("emotion", data.getString("emotion"));
+        msg.put("emotion_trend", data.getString("emotion_trend"));
         msg.put("stage_summary", data.getString("stage_summary"));
         msg.put("missing_slots", data.getJSONArray("missing_slots"));
         msg.put("recommended_questions", data.getJSONArray("recommended_questions"));
@@ -110,6 +114,7 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         msg.put("suggested_reply", data.getString("suggested_reply"));
         msg.put("suggested_followup_questions", data.getJSONArray("suggested_followup_questions"));
         msg.put("task_suggestion", data.getJSONObject("task_suggestion"));
+        msg.put("risk_flags", data.getJSONArray("risk_flags"));
         CallWebSocket.sendMessage(agent.getUserId(), msg.toJSONString());
     }
 

@@ -182,6 +182,12 @@ javaWs.subscribe(ASR_WS_MSG_TYPE, (payload) => {
 
   const durationValue = payload.durationMs ?? payload.duration_ms
   const audioUrl = payload.audio_url ?? payload.audioUrl
+  const entities = payload.entities && typeof payload.entities === 'object' && !Array.isArray(payload.entities)
+    ? Object.fromEntries(Object.entries(payload.entities).map(([key, value]) => [key, String(value)]))
+    : undefined
+  const keywords = Array.isArray(payload.keywords)
+    ? payload.keywords.map((item) => String(item)).filter(Boolean)
+    : undefined
 
   asrMessages.value.push({
     role:       payload.speaker_role === 'agent' ? 'agent' : 'customer',
@@ -191,6 +197,11 @@ javaWs.subscribe(ASR_WS_MSG_TYPE, (payload) => {
     content,
     name:       String(payload.speaker_name ?? (payload.speaker_role === 'agent' ? '客服' : callerName.value)),
     intent:     intentLabel || undefined,
+    intentConfidence: typeof payload.intent_confidence === 'number' ? payload.intent_confidence : undefined,
+    keywords,
+    entities,
+    emotion:    payload.emotion ? String(payload.emotion) : undefined,
+    utteranceSummary: payload.utterance_summary ? String(payload.utterance_summary) : undefined,
     audioUrl:   audioUrl ? String(audioUrl) : undefined,
     durationMs: typeof durationValue === 'number' ? durationValue : undefined,
   })
@@ -339,6 +350,11 @@ function turnsToMessages(turns: CallTurnItem[], customerName: string) {
       content:    turn.corrected_text || turn.raw_text,
       name:       turn.speaker_role === 'agent' ? (turn.speaker_name || '客服') : (customerName || turn.speaker_name || '用户'),
       intent:     turn.intent ? (typeof turn.intent === 'object' ? turn.intent.label : String(turn.intent)) : undefined,
+      intentConfidence: turn.intent && typeof turn.intent === 'object' && typeof turn.intent.confidence === 'number' ? turn.intent.confidence : undefined,
+      keywords:   Array.isArray(turn.keywords) ? turn.keywords : undefined,
+      entities:   turn.entities && Object.keys(turn.entities).length ? turn.entities : undefined,
+      emotion:    turn.emotion || undefined,
+      utteranceSummary: turn.summary || undefined,
       audioUrl:   turn.audio_url || undefined,
       durationMs: turn.duration_ms || undefined,
     }
