@@ -8,12 +8,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.jeecg.modules.call.config.JsonbTypeHandler;
 import org.springframework.format.annotation.DateTimeFormat;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("ivr_node")
+@TableName(value = "ivr_node", autoResultMap = true)
 public class IvrNode implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -29,6 +30,7 @@ public class IvrNode implements Serializable {
 
     private Integer sortOrder;
 
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private String config;
 
     private String nextNodeId;

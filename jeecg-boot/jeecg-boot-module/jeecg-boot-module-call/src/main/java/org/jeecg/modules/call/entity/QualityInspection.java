@@ -9,12 +9,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.jeecg.modules.call.config.JsonbTypeHandler;
 import org.springframework.format.annotation.DateTimeFormat;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("quality_inspection")
+@TableName(value = "quality_inspection", autoResultMap = true)
 public class QualityInspection implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -30,6 +31,7 @@ public class QualityInspection implements Serializable {
 
     private BigDecimal totalScore;
 
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private String scoreDetail;
 
     private String comment;

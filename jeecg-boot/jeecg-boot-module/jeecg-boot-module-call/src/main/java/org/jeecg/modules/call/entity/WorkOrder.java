@@ -8,12 +8,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.jeecg.modules.call.config.JsonbTypeHandler;
 import org.springframework.format.annotation.DateTimeFormat;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("work_order")
+@TableName(value = "work_order", autoResultMap = true)
 public class WorkOrder implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -45,6 +46,7 @@ public class WorkOrder implements Serializable {
 
     private String customerIntent;
 
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private String keyInfo;
 
     private String resolution;
