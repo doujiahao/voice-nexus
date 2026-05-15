@@ -101,6 +101,7 @@ class CallRouteServiceTest {
         req.setCustomerPhone("13800000001");
 
         try (MockedStatic<CallWebSocket> callWebSocket = mockStatic(CallWebSocket.class)) {
+            callWebSocket.when(() -> CallWebSocket.isOnline("user-001")).thenReturn(true);
             RouteResponseDTO resp = callRouteService.route("fs-001", req);
             assertTrue(resp.isSuccess());
             assertEquals("RING", resp.getRouteAction());

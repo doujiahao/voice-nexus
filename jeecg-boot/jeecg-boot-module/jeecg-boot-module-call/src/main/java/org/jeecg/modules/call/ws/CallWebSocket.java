@@ -138,12 +138,14 @@ public class CallWebSocket {
 
     public static void sendMessage(String userId, String message) {
         Session session = SESSION_POOL.get(userId);
-        if (session != null && session.isOpen()) {
-            try {
-                session.getBasicRemote().sendText(message);
-            } catch (IOException e) {
-                log.error("[CallWS] 发送消息失败: userId={}", userId, e);
-            }
+        if (session == null || !session.isOpen()) {
+            log.warn("[CallWS] 发送消息跳过，用户 WS 不在线: userId={}, msg={}", userId, message);
+            return;
+        }
+        try {
+            session.getBasicRemote().sendText(message);
+        } catch (IOException e) {
+            log.error("[CallWS] 发送消息失败: userId={}", userId, e);
         }
     }
 

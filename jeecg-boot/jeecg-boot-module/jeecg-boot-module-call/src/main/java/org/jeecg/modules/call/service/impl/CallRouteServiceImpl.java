@@ -139,9 +139,14 @@ public class CallRouteServiceImpl implements ICallRouteService {
 
         for (SkillGroupAgent sga : agents) {
             AgentProfile profile = agentProfileMapper.selectById(sga.getAgentId());
-            if (profile != null && AgentStatusEnum.ONLINE.getCode().equals(profile.getStatus())) {
-                return profile;
+            if (profile == null || !AgentStatusEnum.ONLINE.getCode().equals(profile.getStatus())) {
+                continue;
             }
+            if (!CallWebSocket.isOnline(profile.getUserId())) {
+                log.info("[Route] 坐席状态为空闲但 WS 不在线，跳过分配: agentId={}, userId={}", profile.getId(), profile.getUserId());
+                continue;
+            }
+            return profile;
         }
         return null;
     }
