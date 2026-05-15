@@ -78,7 +78,7 @@ import { useCallState }   from './composables/useCallState'
 import { useJavaWs }      from './composables/useJavaWs'
 import { useAgentStatus } from './composables/useAgentStatus'
 import { useAgentInfo }   from './composables/useAgentInfo'
-import { ASR_WS_MSG_TYPE } from './config/index'
+import { ASR_WS_MSG_TYPE, AGENT_ASSIST_WS_MSG_TYPE } from './config/index'
 import { formatDate }     from './utils/format'
 import type { CallDetail, CallTurnItem } from './types'
 
@@ -113,7 +113,7 @@ const hadRealCall = ref(false)
 let _hangupHandled = false
 
 // ── Composables ───────────────────────────────────────────────────────────────
-const { analysisResult, isAnalyzing, analysisError, addRealtimeIntent, reset: resetAnalysis, setResult: setAnalysisResult, runFullAnalysis } = useAnalysis({ enabled: aiEnabled })
+const { analysisResult, isAnalyzing, analysisError, addRealtimeIntent, mergeAgentAssist, loadFromSummary, markAnalyzing, setError: setAnalysisError, reset: resetAnalysis } = useAnalysis()
 const { asrState, asrMessages, startAsr, stopAsr, setSessionId, clearMessages, setMessages } = useAsr({ callerNameRef: callerName as any })
 const javaWs = useJavaWs()
 
@@ -133,26 +133,23 @@ javaWs.subscribe('call_state', (payload) => {
     // 清除计时器但不切换 callPhase（由后续逻辑决定）
     if (durationTimer) { clearInterval(durationTimer); durationTimer = null }
     stopAsr()
-    // 保存转写副本用于 AI 分析
-    const messagesForAnalysis = [...asrMessages.value]
     clearMessages()
-    resetAnalysis()
     if (hadRealCall.value) {
       // 有实际通话 → 话后整理
       setWrapUp()
       // 先切 idle 再切 reviewing（toReviewing 要求 callPhase !== active）
       toIdle()
       toReviewing()
-      // 通话结束后触发 AI 完整分析
-      if (aiEnabled.value && messagesForAnalysis.length > 0) {
-        runFullAnalysis(messagesForAnalysis)
-      }
+      // 通话结束后等待后端通过 REST 提供的 summary（call_session.summary）
+      if (aiEnabled.value) markAnalyzing()
       // 持久化备注 + 刷新通话列表
       if (callSessionId.value && savedNote.value) updateCallRecordNote(callSessionId.value, savedNote.value)
       savedNote.value = ''
       callNote.value  = ''
+      const endedSessionId = callSessionId.value
       callSessionId.value = ''
       fetchCallList()
+      if (endedSessionId && aiEnabled.value) loadSummaryForSession(endedSessionId)
     } else {
       // 拒接/未接通 → 从振铃恢复空闲
       resetFromRinging()
@@ -207,6 +204,11 @@ javaWs.subscribe(ASR_WS_MSG_TYPE, (payload) => {
   })
 
   if (intentLabel) addRealtimeIntent(intentLabel)
+})
+
+javaWs.subscribe(AGENT_ASSIST_WS_MSG_TYPE, (payload) => {
+  if (!aiEnabled.value) return
+  mergeAgentAssist(payload as Record<string, unknown>)
 })
 
 // ── 坐席状态 ──────────────────────────────────────────────────────────────────
@@ -315,29 +317,26 @@ async function acceptCall(): Promise<void> {
 async function hangupCall(): Promise<void> {
   showToast('通话已挂断')
   _hangupHandled = true
+  const endedSessionId = callSessionId.value
   // 通知后端坐席挂断
-  if (callSessionId.value) {
-    javaWs.send({ type: 'call_response', call_id: callSessionId.value, action: 'hangup' })
+  if (endedSessionId) {
+    javaWs.send({ type: 'call_response', call_id: endedSessionId, action: 'hangup' })
   }
   if (durationTimer) { clearInterval(durationTimer); durationTimer = null }
   stopAsr()
-  // 保存转写副本用于 AI 分析，再清空
-  const messagesForAnalysis = [...asrMessages.value]
   clearMessages()
-  resetAnalysis()
   // 前端主动挂断 → 进入话后整理
   setWrapUp()
   toIdle()
   toReviewing()
-  // 通话结束后触发 AI 完整分析
-  if (aiEnabled.value && messagesForAnalysis.length > 0) {
-    runFullAnalysis(messagesForAnalysis)
-  }
+  // 通话结束后等待后端 summary（REST 拉取，由 generateSessionSummary 异步写入 call_session.summary）
+  if (aiEnabled.value) markAnalyzing()
   await fetchCallList()
-  if (callSessionId.value && savedNote.value) updateCallRecordNote(callSessionId.value, savedNote.value)
+  if (endedSessionId && savedNote.value) updateCallRecordNote(endedSessionId, savedNote.value)
   savedNote.value = ''
   callNote.value  = ''
   callSessionId.value = ''
+  if (endedSessionId && aiEnabled.value) loadSummaryForSession(endedSessionId)
 }
 
 function turnsToMessages(turns: CallTurnItem[], customerName: string) {
@@ -383,21 +382,32 @@ async function onRecordSelect(id: string): Promise<void> {
 
 watch(activeTab, (tab) => {
   if (tab !== 'analysis' || isCallActive.value || !cachedDetail.value) return
-  const summary = cachedDetail.value.summary
-  if (summary) {
-    setAnalysisResult({
-      sentiments:  [],
-      intents:     summary.customer_intent ? [summary.customer_intent] : [],
-      keywords:    (summary.keywords ?? []).map((w: string) => ({ word: w, size: 14 })),
-      suggestions: [],
-    })
-  } else if (asrMessages.value.length > 0 && aiEnabled.value) {
-    // 后端无 summary，用本地转写触发 AI 分析
-    runFullAnalysis(asrMessages.value)
-  } else {
-    resetAnalysis()
-  }
+  loadFromSummary(cachedDetail.value.summary)
 })
+
+async function loadSummaryForSession(sessionId: string, attempt = 0): Promise<void> {
+  // 后端 generateSessionSummary 在挂断时异步执行，需轮询拉取
+  const maxAttempts = 10
+  const delayMs = 1500
+  try {
+    const detail = await fetchCallDetail(sessionId)
+    if (detail?.summary) {
+      cachedDetail.value = detail
+      loadFromSummary(detail.summary)
+      return
+    }
+  } catch (err: any) {
+    if (attempt >= maxAttempts - 1) {
+      setAnalysisError(err?.message || '会话总结加载失败')
+      return
+    }
+  }
+  if (attempt >= maxAttempts - 1) {
+    setAnalysisError('会话总结生成超时，请稍后在历史记录中查看')
+    return
+  }
+  setTimeout(() => loadSummaryForSession(sessionId, attempt + 1), delayMs)
+}
 </script>
 
 <style scoped>
