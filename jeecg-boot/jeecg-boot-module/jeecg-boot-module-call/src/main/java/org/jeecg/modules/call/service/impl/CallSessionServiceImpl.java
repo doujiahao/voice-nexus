@@ -84,23 +84,31 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
             case "ANSWERED":
                 log.info("[CallEvent] 处理 ANSWERED: fsCallId={}, sessionId={}, agentId={}, oldStatus={}",
                         fsCallId, session.getId(), session.getAgentId(), session.getStatus());
+                if ("ENDED".equals(session.getStatus())) {
+                    log.warn("[CallEvent] 忽略已结束会话的接通事件: fsCallId={}, sessionId={}, agentId={}",
+                            fsCallId, session.getId(), session.getAgentId());
+                    result.put("status", session.getStatus());
+                    break;
+                }
+                if (session.getAgentId() == null) {
+                    log.warn("[CallEvent] 忽略无坐席会话的接通事件: fsCallId={}, sessionId={}, currentStatus={}",
+                            fsCallId, session.getId(), session.getStatus());
+                    result.put("status", session.getStatus());
+                    break;
+                }
                 session.setStatus("TALKING");
                 session.setAnswerTime(new Date());
                 updateById(session);
                 log.info("[CallEvent] 已更新会话为 TALKING: fsCallId={}, sessionId={}, agentId={}",
                         fsCallId, session.getId(), session.getAgentId());
-                if (session.getAgentId() != null) {
-                    AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
-                    if (agent != null) {
-                        log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
-                                fsCallId, session.getId(), agent.getId(), agent.getUserId());
-                        agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.TALKING, "通话接通");
-                    } else {
-                        log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
-                                fsCallId, session.getId(), session.getAgentId());
-                    }
+                AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+                if (agent != null) {
+                    log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
+                            fsCallId, session.getId(), agent.getId(), agent.getUserId());
+                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.TALKING, "通话接通");
                 } else {
-                    log.warn("[CallEvent] 接通事件会话没有 agentId: fsCallId={}, sessionId={}", fsCallId, session.getId());
+                    log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
+                            fsCallId, session.getId(), session.getAgentId());
                 }
                 result.put("status", "TALKING");
                 break;

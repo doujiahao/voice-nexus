@@ -193,15 +193,20 @@ public class CallRouteServiceImpl implements ICallRouteService {
                         fsCallId, sessionId, skillGroupId, sga.getId(), sga.getAgentId());
                 continue;
             }
-            boolean online = CallWebSocket.isOnline(profile.getUserId());
-            log.info("[Route] 候选坐席详情: fsCallId={}, sessionId={}, skillGroupId={}, agentId={}, userId={}, agentNo={}, extension={}, status={}, wsOnline={}",
+            log.info("[Route] 候选坐席详情: fsCallId={}, sessionId={}, skillGroupId={}, agentId={}, userId={}, agentNo={}, extension={}, status={}",
                     fsCallId, sessionId, skillGroupId, profile.getId(), profile.getUserId(), profile.getAgentNo(),
-                    profile.getExtension(), profile.getStatus(), online);
+                    profile.getExtension(), profile.getStatus());
             if (!AgentStatusEnum.ONLINE.getCode().equals(profile.getStatus())) {
                 log.info("[Route] 跳过坐席，状态不是 ONLINE: fsCallId={}, sessionId={}, agentId={}, userId={}, status={}",
                         fsCallId, sessionId, profile.getId(), profile.getUserId(), profile.getStatus());
                 continue;
             }
+            if (profile.getUserId() == null) {
+                log.warn("[Route] 跳过坐席，缺少 userId: fsCallId={}, sessionId={}, agentId={}, extension={}",
+                        fsCallId, sessionId, profile.getId(), profile.getExtension());
+                continue;
+            }
+            boolean online = CallWebSocket.isOnline(profile.getUserId());
             if (!online) {
                 log.info("[Route] 跳过坐席，WS 不在线: fsCallId={}, sessionId={}, agentId={}, userId={}, extension={}",
                         fsCallId, sessionId, profile.getId(), profile.getUserId(), profile.getExtension());

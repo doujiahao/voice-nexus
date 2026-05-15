@@ -88,6 +88,28 @@ class CallSessionServiceTest {
     }
 
     @Test
+    void handleEvent_answered_shouldIgnoreEndedSessionWithoutAgent() {
+        CallSession session = new CallSession();
+        session.setId("sess-001");
+        session.setStatus("ENDED");
+
+        doReturn(session).when(callSessionService).getByFsCallId("fs-001");
+
+        CallEventDTO event = new CallEventDTO();
+        event.setEventType("ANSWERED");
+
+        Map<String, Object> result = callSessionService.handleEvent("fs-001", event);
+        assertTrue((Boolean) result.get("acknowledged"));
+        assertEquals("ENDED", result.get("status"));
+        assertEquals("ENDED", session.getStatus());
+        assertNull(session.getAnswerTime());
+
+        verify(callSessionMapper, never()).updateById(any(CallSession.class));
+        verify(agentProfileService, never()).changeStatus(anyString(), any(), anyString());
+        verify(callEventLogMapper).insert(any(CallEventLog.class));
+    }
+
+    @Test
     void handleEvent_callEnded_shouldEndSession() {
         CallSession session = new CallSession();
         session.setId("sess-001");
