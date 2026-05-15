@@ -64,8 +64,10 @@ public class CallWsMessageHandler {
             callSessionService.updateStatus(callId, "TALKING");
             log.info("[CallWS] 已更新会话为 TALKING: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.TALKING, "坐席接听");
+            CallWebSocket.pushAgentStatus(userId, "on_call");
             CallWebSocket.pushCallState(userId, "active");
             CallWebSocket.pushCallSession(userId, callId);
+            log.info("[CallWS] 已推送坐席接听状态: userId={}, callId={}, agentStatus=on_call, callState=active", userId, callId);
 
             // 通知 FreeSwitch 桥接并开始流式传输
             CallSession session = callSessionService.getById(callId);
@@ -94,7 +96,9 @@ public class CallWsMessageHandler {
             callSessionService.updateStatus(callId, "QUEUING");
             log.info("[CallWS] 已更新拒接会话为 QUEUING: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.ONLINE, "坐席拒接");
+            CallWebSocket.pushAgentStatus(userId, "idle");
             CallWebSocket.pushCallState(userId, "idle");
+            log.info("[CallWS] 已推送坐席拒接状态: userId={}, callId={}, agentStatus=idle, callState=idle", userId, callId);
         } else if ("hangup".equals(action)) {
             log.info("[CallWS] 坐席挂断通话: userId={}, callId={}, msg={}", userId, callId, msg);
             notifyFsHangup(callId, "NORMAL_CLEARING");
@@ -102,7 +106,9 @@ public class CallWsMessageHandler {
             callSessionService.updateStatus(callId, "ENDED");
             log.info("[CallWS] 已更新挂断会话为 ENDED: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.WRAP_UP, "坐席挂断");
+            CallWebSocket.pushAgentStatus(userId, "wrap_up");
             CallWebSocket.pushCallState(userId, "idle");
+            log.info("[CallWS] 已推送坐席挂断状态: userId={}, callId={}, agentStatus=wrap_up, callState=idle", userId, callId);
         } else {
             log.warn("[CallWS] 未知来电响应动作: userId={}, callId={}, action={}, msg={}", userId, callId, action, msg);
         }

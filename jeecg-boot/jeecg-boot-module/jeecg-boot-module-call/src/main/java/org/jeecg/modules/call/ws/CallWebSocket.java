@@ -214,6 +214,7 @@ public class CallWebSocket {
         msg.put("type", "call_session");
         msg.put("call_session_id", callSessionId);
         sendMessage(agentUserId, msg.toJSONString());
+        log.info("[CallWS] 推送通话会话: agentUserId={}, callSessionId={}", agentUserId, callSessionId);
     }
 
     public static void pushAgentStatus(String agentUserId, String status) {
@@ -221,6 +222,7 @@ public class CallWebSocket {
         msg.put("type", "agent_status");
         msg.put("status", status);
         sendMessage(agentUserId, msg.toJSONString());
+        log.info("[CallWS] 推送坐席状态: agentUserId={}, status={}", agentUserId, status);
     }
 
     public static void pushCallState(String agentUserId, String state) {
@@ -228,6 +230,7 @@ public class CallWebSocket {
         msg.put("type", "call_state");
         msg.put("state", state);
         sendMessage(agentUserId, msg.toJSONString());
+        log.info("[CallWS] 推送通话状态: agentUserId={}, state={}", agentUserId, state);
     }
 
     public static void pushAsrResult(String agentUserId, String correctedText, String speakerRole,

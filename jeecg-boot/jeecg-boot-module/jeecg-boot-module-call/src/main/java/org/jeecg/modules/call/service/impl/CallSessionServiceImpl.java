@@ -117,6 +117,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                     CallWebSocket.pushCallSession(agent.getUserId(), session.getId());
                     CallWebSocket.pushAgentStatus(agent.getUserId(), "on_call");
                     CallWebSocket.pushCallState(agent.getUserId(), "active");
+                    log.info("[CallEvent] 已推送话机接听状态: fsCallId={}, sessionId={}, userId={}, previousStatus={}, agentStatus=on_call, callState=active",
+                            fsCallId, session.getId(), agent.getUserId(), previousStatus);
                 } else {
                     log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                             fsCallId, session.getId(), session.getAgentId());
@@ -170,13 +172,18 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}, previousStatus={}",
                         session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId(), previousStatus);
                 if ("RINGING".equals(previousStatus)) {
-                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, "来电取消");
+                    String reason = "来电取消: " + hangupCause;
+                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, reason);
                     CallWebSocket.pushAgentStatus(agent.getUserId(), "idle");
                     CallWebSocket.pushCallState(agent.getUserId(), "idle");
+                    log.info("[CallEvent] 已推送振铃取消状态: fsCallId={}, sessionId={}, userId={}, hangupCause={}, agentStatus=idle, callState=idle",
+                            session.getFsCallId(), session.getId(), agent.getUserId(), hangupCause);
                 } else {
                     agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
                     CallWebSocket.pushAgentStatus(agent.getUserId(), "wrap_up");
                     CallWebSocket.pushCallState(agent.getUserId(), "idle");
+                    log.info("[CallEvent] 已推送通话结束状态: fsCallId={}, sessionId={}, userId={}, previousStatus={}, agentStatus=wrap_up, callState=idle",
+                            session.getFsCallId(), session.getId(), agent.getUserId(), previousStatus);
                 }
             } else {
                 log.warn("[CallEvent] 结束会话找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
@@ -211,5 +218,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
             return;
         }
         CallWebSocket.pushIncomingCallCancelled(agent.getUserId(), session.getId(), session.getFsCallId(), hangupCause);
+        log.info("[CallEvent] 已推送来电弹框取消: fsCallId={}, sessionId={}, userId={}, hangupCause={}",
+                session.getFsCallId(), session.getId(), agent.getUserId(), hangupCause);
     }
 }
