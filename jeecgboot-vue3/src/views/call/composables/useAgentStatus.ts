@@ -59,6 +59,11 @@ export function useAgentStatus() {
     _initialized = true
     javaWs.subscribe('agent_status', _handleServerStatus as any)
     await fetchStatus()
+    // 进入工作台自动签入：离线/忙碌 → 空闲，确保后端可分配来电
+    if (_status.value === 'offline' || _status.value === 'busy') {
+      console.info('[AgentStatus] 进入工作台自动签入:', _status.value, '→ idle')
+      await setStatus('idle')
+    }
   }
 
   async function fetchStatus(): Promise<void> {
