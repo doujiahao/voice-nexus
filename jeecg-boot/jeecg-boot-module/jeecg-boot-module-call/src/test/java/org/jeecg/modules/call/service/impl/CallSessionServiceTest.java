@@ -10,6 +10,7 @@ import org.jeecg.modules.call.mapper.AgentProfileMapper;
 import org.jeecg.modules.call.mapper.CallEventLogMapper;
 import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.service.IAgentProfileService;
+import org.jeecg.modules.call.service.ICallQueueService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,7 @@ class CallSessionServiceTest {
     @Mock private CallEventLogMapper callEventLogMapper;
     @Mock private AgentProfileMapper agentProfileMapper;
     @Mock private IAgentProfileService agentProfileService;
+    @Mock private ICallQueueService callQueueService;
     @Mock private CallEndProcessor callEndProcessor;
 
     @Spy
@@ -45,6 +47,7 @@ class CallSessionServiceTest {
         ReflectionTestUtils.setField(callSessionService, "callEventLogMapper", callEventLogMapper);
         ReflectionTestUtils.setField(callSessionService, "agentProfileMapper", agentProfileMapper);
         ReflectionTestUtils.setField(callSessionService, "agentProfileService", agentProfileService);
+        ReflectionTestUtils.setField(callSessionService, "callQueueService", callQueueService);
         ReflectionTestUtils.setField(callSessionService, "callEndProcessor", callEndProcessor);
     }
 
@@ -115,6 +118,7 @@ class CallSessionServiceTest {
         session.setId("sess-001");
         session.setStatus("TALKING");
         session.setAgentId("agent-001");
+        session.setSkillGroupId("skill-001");
 
         AgentProfile agent = new AgentProfile();
         agent.setId("agent-001");
@@ -137,6 +141,7 @@ class CallSessionServiceTest {
         assertEquals(120, session.getDurationSec());
 
         verify(agentProfileService).changeStatus("user-001", AgentStatusEnum.WRAP_UP, "通话结束");
+        verify(callQueueService).remove("skill-001", "sess-001");
         verify(callEndProcessor).processCallEnd(session);
     }
 

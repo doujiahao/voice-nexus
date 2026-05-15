@@ -13,6 +13,7 @@ import org.jeecg.modules.call.mapper.AgentProfileMapper;
 import org.jeecg.modules.call.mapper.CallEventLogMapper;
 import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.service.IAgentProfileService;
+import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     private AgentProfileMapper agentProfileMapper;
     @Autowired
     private IAgentProfileService agentProfileService;
+    @Autowired
+    private ICallQueueService callQueueService;
     @Autowired
     private CallEndProcessor callEndProcessor;
 
@@ -148,6 +151,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         updateById(session);
         log.info("[CallEvent] 已更新会话为 ENDED: fsCallId={}, sessionId={}, agentId={}, hangupCause={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), hangupCause);
+        removeFromQueueIfNeeded(session);
 
         // 坐席恢复空闲
         if (session.getAgentId() != null) {
@@ -167,5 +171,14 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         log.info("[CallEvent] 准备执行通话结束后处理: fsCallId={}, sessionId={}", session.getFsCallId(), session.getId());
         callEndProcessor.processCallEnd(session);
         log.info("[CallEvent] 通话结束后处理完成: fsCallId={}, sessionId={}", session.getFsCallId(), session.getId());
+    }
+
+    private void removeFromQueueIfNeeded(CallSession session) {
+        if (session.getSkillGroupId() == null) {
+            return;
+        }
+        callQueueService.remove(session.getSkillGroupId(), session.getId());
+        log.info("[CallEvent] 已清理排队队列: fsCallId={}, sessionId={}, skillGroupId={}",
+                session.getFsCallId(), session.getId(), session.getSkillGroupId());
     }
 }

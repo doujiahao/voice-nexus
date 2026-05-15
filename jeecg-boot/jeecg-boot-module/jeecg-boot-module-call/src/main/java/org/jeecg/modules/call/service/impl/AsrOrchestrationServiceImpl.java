@@ -65,9 +65,18 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         });
         body.add("language", "zh");
         body.add("enable_correction", "true");
-        body.add("speaker_id", speakerId);
-        body.add("speaker_name", speakerName);
-        body.add("speaker_role", speakerRole);
+        String normalizedSpeakerRole = hasText(speakerRole) ? speakerRole.trim().toLowerCase() : null;
+        if (hasText(speakerId)) {
+            body.add("speaker_id", speakerId.trim());
+        }
+        if (hasText(speakerName)) {
+            body.add("speaker_name", speakerName.trim());
+        }
+        if (normalizedSpeakerRole != null) {
+            body.add("speaker_role", normalizedSpeakerRole);
+        }
+        log.info("[ASR] 准备调用 Gateway: sessionId={}, path={}, speakerId={}, speakerName={}, rawSpeakerRole={}, requestSpeakerRole={}",
+                sessionId, audioPath, speakerId, speakerName, speakerRole, normalizedSpeakerRole);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
@@ -92,6 +101,18 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         }
 
         JSONObject data = result.getJSONObject("data");
+        if (data == null) {
+            log.warn("[ASR] Gateway 返回缺少 data: sessionId={}, resp={}", sessionId, result);
+            return;
+        }
+        log.info("[ASR] Gateway 识别成功: sessionId={}, speakerRole={}, correctedText={}, intent={}, emotion={}, nlpEnabled={}, utteranceSummary={}",
+                sessionId,
+                data.getString("speaker_role"),
+                abbreviate(data.getString("corrected_text"), 80),
+                data.getString("intent"),
+                data.getString("emotion"),
+                data.getString("nlp_enabled"),
+                abbreviate(data.getString("utterance_summary"), 80));
         saveTurnAndPush(sessionId, audioPath, speakerId, speakerName, speakerRole, data);
     }
 
@@ -103,7 +124,7 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         turn.setSessionId(sessionId);
         turn.setTurnIndex(turnCount.intValue() + 1);
         turn.setSpeakerId(speakerId);
-        turn.setSpeakerRole(speakerRole);
+        turn.setSpeakerRole(hasText(data.getString("speaker_role")) ? data.getString("speaker_role") : speakerRole);
         turn.setText(data.getString("raw_text"));
         turn.setCorrectedText(data.getString("corrected_text"));
         turn.setDurationMs(data.getInteger("duration_ms"));
@@ -122,7 +143,7 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
 
         JSONObject turnCtx = new JSONObject();
         turnCtx.put("turn_id", turn.getId());
-        turnCtx.put("speaker_role", speakerRole);
+        turnCtx.put("speaker_role", turn.getSpeakerRole());
         turnCtx.put("speaker_name", speakerName);
         turnCtx.put("corrected_text", turn.getCorrectedText() != null ? turn.getCorrectedText() : turn.getText());
         turnCtx.put("intent", turn.getIntent());
@@ -132,7 +153,7 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         CallSession session = callSessionMapper.selectById(sessionId);
         pushToFrontend(session, turn, data);
 
-        if (session != null && "customer".equalsIgnoreCase(speakerRole)) {
+        if (session != null && "customer".equalsIgnoreCase(turn.getSpeakerRole())) {
             nlpOrchestrationService.analyzeAgentAssist(session, turn.getId());
         }
     }
@@ -160,6 +181,17 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
     private boolean isEmptyTextResponse(Exception e) {
         String message = e.getMessage();
         return message != null && message.contains("empty text");
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String abbreviate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength) + "...";
     }
 
     private byte[] downloadFromMinio(String objectPath) {

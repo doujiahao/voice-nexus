@@ -38,6 +38,11 @@ public class AudioPipelineServiceImpl implements IAudioPipelineService {
         boolean isLast = frame.getIsLast();
         byte[] audioData = frame.getData().toByteArray();
 
+        if (isLast) {
+            log.info("[AudioPipeline] 收到最终音频帧: sessionId={}, speakerId={}, speakerName={}, speakerRole={}, sequence={}, bytes={}",
+                    sessionId, speakerId, speakerName, speakerRole, frame.getSequenceNumber(), audioData.length);
+        }
+
         if (isEmptyAudio(audioData)) {
             log.debug("[AudioPipeline] 空音频帧已跳过: sessionId={}, speakerId={}, sequence={}",
                     sessionId, speakerId, frame.getSequenceNumber());
