@@ -10,6 +10,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.net.URLDecoder;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * minio文件上传工具类
@@ -47,6 +49,8 @@ public class MinioUtil {
     }
 
     private static MinioClient minioClient = null;
+    private static final Set<String> CHECKED_BUCKETS = ConcurrentHashMap.newKeySet();
+    private static final ConcurrentHashMap<String, Object> BUCKET_LOCKS = new ConcurrentHashMap<>();
 
     /**
      * 上传文件
@@ -67,14 +71,7 @@ public class MinioUtil {
         }
         try {
             initMinio(minioUrl, minioName,minioPass);
-            // 检查存储桶是否已经存在
-            if(minioClient.bucketExists(BucketExistsArgs.builder().bucket(newBucket).build())) {
-                log.info("Bucket already exists.");
-            } else {
-                // 创建一个名为ota的存储桶
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(newBucket).build());
-                log.info("create a new bucket.");
-            }
+            ensureBucketExists(newBucket);
             InputStream stream = file.getInputStream();
             // 获取文件名
             String orgName = file.getOriginalFilename();
@@ -194,6 +191,30 @@ public class MinioUtil {
         return minioClient;
     }
 
+    private static void ensureBucketExists(String bucket) throws Exception {
+        String cacheKey = minioUrl + "|" + bucket;
+        if (CHECKED_BUCKETS.contains(cacheKey)) {
+            return;
+        }
+        Object lock = BUCKET_LOCKS.computeIfAbsent(cacheKey, key -> new Object());
+        synchronized (lock) {
+            if (CHECKED_BUCKETS.contains(cacheKey)) {
+                return;
+            }
+            if (!minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build())) {
+                try {
+                    minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+                    log.info("create a new bucket: {}", bucket);
+                } catch (Exception e) {
+                    if (!minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build())) {
+                        throw e;
+                    }
+                }
+            }
+            CHECKED_BUCKETS.add(cacheKey);
+        }
+    }
+
     /**
      * 上传文件到minio
      * @param stream
@@ -202,13 +223,7 @@ public class MinioUtil {
      */
     public static String upload(InputStream stream,String relativePath) throws Exception {
         initMinio(minioUrl, minioName,minioPass);
-        if(minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build())) {
-            log.info("Bucket already exists.");
-        } else {
-            // 创建一个名为ota的存储桶
-            minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
-            log.info("create a new bucket.");
-        }
+        ensureBucketExists(bucketName);
         PutObjectArgs objectArgs = PutObjectArgs.builder().object(relativePath)
                 .bucket(bucketName)
                 .contentType("application/octet-stream")
