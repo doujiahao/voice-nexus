@@ -67,7 +67,9 @@ function _handleIncomingCallCancelled(msg: Record<string, unknown>): void {
   const matches = _matchesCall(msg)
 
   if (_incomingCall.value && matches(_incomingCall.value)) {
+    _clearRingTimer()
     _rejectedFromRinging.value = true
+    _incomingCall.value = null
     _next()
     return
   }
@@ -81,7 +83,9 @@ function _handleIncomingCallAnswered(msg: Record<string, unknown>): void {
   const matches = _matchesCall(msg)
 
   if (_incomingCall.value && matches(_incomingCall.value)) {
+    _clearRingTimer()
     _answeredCall.value = _incomingCall.value
+    _incomingCall.value = null
     _next()
     return
   }

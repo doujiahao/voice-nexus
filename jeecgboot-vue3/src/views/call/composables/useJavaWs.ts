@@ -112,6 +112,7 @@ function _doConnect(): void {
   _ws = ws
 
   ws.onopen = () => {
+    if (_ws !== ws) return
     _reconnectCount.value = 0
     _wsError.value = null
     _showReloadHint.value = false
@@ -124,6 +125,7 @@ function _doConnect(): void {
   }
 
   ws.onmessage = (ev: MessageEvent) => {
+    if (_ws !== ws) return
     _lastMessageAt = Date.now()
     _resetHeartbeatWatch()
     if (typeof ev.data !== 'string') return
@@ -142,10 +144,12 @@ function _doConnect(): void {
   }
 
   ws.onerror = () => {
+    if (_ws !== ws) return
     _wsError.value = 'WebSocket 连接错误'
   }
 
   ws.onclose = (ev: CloseEvent) => {
+    if (_ws !== ws) return
     _clearTimers()
     _ws = null
     if (_intentionalClose) {

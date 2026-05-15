@@ -91,6 +91,15 @@ public class CallWsMessageHandler {
             }
         } else if ("reject".equals(action)) {
             log.info("[CallWS] 坐席拒接来电: userId={}, callId={}, msg={}", userId, callId, msg);
+            CallSession session = callSessionService.getById(callId);
+            if (session == null) {
+                log.warn("[CallWS] 忽略拒接，未找到会话: userId={}, callId={}", userId, callId);
+                return;
+            }
+            if (!"RINGING".equals(session.getStatus())) {
+                log.warn("[CallWS] 忽略非振铃会话拒接: userId={}, callId={}, currentStatus={}", userId, callId, session.getStatus());
+                return;
+            }
             notifyFsHangup(callId, "REJECTED");
 
             callSessionService.updateStatus(callId, "QUEUING");
@@ -101,6 +110,15 @@ public class CallWsMessageHandler {
             log.info("[CallWS] 已推送坐席拒接状态: userId={}, callId={}, agentStatus=idle, callState=idle", userId, callId);
         } else if ("hangup".equals(action)) {
             log.info("[CallWS] 坐席挂断通话: userId={}, callId={}, msg={}", userId, callId, msg);
+            CallSession session = callSessionService.getById(callId);
+            if (session == null) {
+                log.warn("[CallWS] 忽略挂断，未找到会话: userId={}, callId={}", userId, callId);
+                return;
+            }
+            if ("ENDED".equals(session.getStatus())) {
+                log.warn("[CallWS] 忽略已结束会话挂断: userId={}, callId={}", userId, callId);
+                return;
+            }
             notifyFsHangup(callId, "NORMAL_CLEARING");
 
             callSessionService.updateStatus(callId, "ENDED");
