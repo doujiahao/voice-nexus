@@ -198,8 +198,8 @@
 
 	<!-- 查询表字典的数据, 支持设置过滤条件和code值 精确匹配查询【已加入SQL注入check】 -->
 	<select id="queryTableDictByKeysAndFilterSql" parameterType="String" resultType="org.jeecg.common.system.vo.DictModel">
-		select ${text} as "text", ${code} as "value" from ${table} 
-		where ${code} IN (
+		select ${text} as "text", ${code} as "value" from ${table}
+		where cast(${code} as varchar) IN (
 		<foreach item="key" collection="codeValues" separator=",">
 			#{key}
 		</foreach>
