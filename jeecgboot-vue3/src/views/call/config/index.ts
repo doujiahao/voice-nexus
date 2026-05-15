@@ -1,7 +1,19 @@
 /** 话务模块配置，从 .env.development 读取 */
 
+function _buildWsUrl(): string {
+  const envUrl = (import.meta.env.VITE_CALL_WS_URL ?? '') as string
+  if (envUrl) return envUrl
+  // 根据当前页面 hostname 自动拼接，换环境无需改配置
+  // 开发环境走 Vite 代理（/call → 后端 /jeecg-boot），WS 路径同 REST 的 VITE_CALL_API_BASE
+  // 生产环境直连，/jeecg-boot 是 Spring Boot context-path
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const apiBase = (import.meta.env.VITE_CALL_API_BASE ?? '') as string
+  const wsPath = apiBase ? `${apiBase}/call/ws` : '/jeecg-boot/call/ws'
+  return `${proto}//${location.host}${wsPath}`
+}
+
 export const CALL_WS_CONFIG = {
-  wsUrl:                (import.meta.env.VITE_CALL_WS_URL ?? '') as string,
+  wsUrl:                _buildWsUrl(),
   heartbeatIntervalMs:  20000,
   heartbeatTimeoutMs:   60000,
   reconnectDelayMs:     1000,
