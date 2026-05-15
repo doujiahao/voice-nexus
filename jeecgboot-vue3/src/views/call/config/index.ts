@@ -1,4 +1,4 @@
-/** 话务模块配置，从 .env.development 读取 */
+/** 话务模块配置，从当前构建环境读取 */
 
 function _buildWsUrl(): string {
   const envUrl = (import.meta.env.VITE_CALL_WS_URL ?? '').trim()
@@ -7,11 +7,11 @@ function _buildWsUrl(): string {
   // 开发环境: http://localhost:3100 → ws://localhost:3100/call/call/ws
   //   Vite 代理 /call → http://后端/jeecg-boot，rewrite 去掉 /call 前缀
   //   所以 /call/call/ws → 后端 /jeecg-boot/call/ws ✅
-  // 生产环境: http://服务器IP → ws://服务器IP/jeecg-boot/call/ws
-  //   Nginx 直接转发 /jeecg-boot/ 到后端
+  // 生产环境复用 VITE_GLOB_API_URL，避免 /jeecgboot 与 /jeecg-boot 前缀不一致
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const isDev = import.meta.env.DEV
-  const wsPath = isDev ? '/call/call/ws' : '/jeecg-boot/call/ws'
+  const apiBase = (import.meta.env.VITE_GLOB_API_URL ?? '/jeecgboot').trim() || '/jeecgboot'
+  const wsPath = isDev ? '/call/call/ws' : `${apiBase.replace(/\/$/, '')}/call/ws`
   return `${proto}//${location.host}${wsPath}`
 }
 
