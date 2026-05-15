@@ -46,6 +46,7 @@ import org.jeecgframework.poi.excel.def.NormalExcelConstants;
 import org.jeecgframework.poi.excel.entity.ExportParams;
 import org.jeecgframework.poi.excel.entity.enmus.ExcelType;
 import org.jeecgframework.poi.excel.view.JeecgEntityExcelView;
+import org.jeecg.modules.system.mapper.SysCallAgentMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -109,7 +110,9 @@ public class SysUserController {
     private JeecgRedisClient jeecgRedisClient;
     @Autowired
     private JeecgBaseConfig jeecgBaseConfig;
-    
+    @Autowired
+    private SysCallAgentMapper sysCallAgentMapper;
+
     /**
      * 获取租户下用户数据（支持租户隔离）
      * @param user
@@ -710,6 +713,7 @@ public class SysUserController {
         //TODO 判断当前操作的角色是当前登录租户下的
         try {
             String sysRoleId = sysUserRoleVO.getRoleId();
+            boolean callAgentRole = isCallAgentRole(sysRoleId);
             for(String sysUserId:sysUserRoleVO.getUserIdList()) {
                 SysUserRole sysUserRole = new SysUserRole(sysUserId,sysRoleId);
                 QueryWrapper<SysUserRole> queryWrapper = new QueryWrapper<SysUserRole>();
@@ -717,6 +721,9 @@ public class SysUserController {
                 SysUserRole one = sysUserRoleService.getOne(queryWrapper);
                 if(one==null){
                     sysUserRoleService.save(sysUserRole);
+                }
+                if (callAgentRole) {
+                    ensureCallAgentBinding(sysUserId);
                 }
 
             }
@@ -730,6 +737,63 @@ public class SysUserController {
             return result;
         }
     }
+
+    private boolean isCallAgentRole(String roleId) {
+        Integer count = sysCallAgentMapper.countCallAgentRole(roleId);
+        return count != null && count > 0;
+    }
+
+    private void ensureCallAgentBinding(String userId) {
+        if (!hasCallTables()) {
+            return;
+        }
+        String skillGroupId = ensureDefaultSkillGroup();
+        String agentId = ensureAgentProfile(userId);
+        String relationId = sysCallAgentMapper.querySkillGroupAgentId(skillGroupId, agentId);
+        if (relationId == null) {
+            sysCallAgentMapper.insertSkillGroupAgent(stableId("skill_group_agent:" + skillGroupId + ":" + agentId), skillGroupId, agentId);
+            return;
+        }
+        sysCallAgentMapper.enableSkillGroupAgent(relationId);
+    }
+
+    private boolean hasCallTables() {
+        try {
+            sysCallAgentMapper.checkAgentProfileTable();
+            sysCallAgentMapper.checkSkillGroupTable();
+            sysCallAgentMapper.checkSkillGroupAgentTable();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String ensureDefaultSkillGroup() {
+        String skillGroupId = sysCallAgentMapper.queryDefaultSkillGroupId();
+        if (skillGroupId == null) {
+            skillGroupId = stableId("skill_group:default");
+            sysCallAgentMapper.insertDefaultSkillGroup(skillGroupId);
+            return skillGroupId;
+        }
+        sysCallAgentMapper.enableSkillGroup(skillGroupId);
+        return skillGroupId;
+    }
+
+    private String ensureAgentProfile(String userId) {
+        String agentId = sysCallAgentMapper.queryAgentProfileId(userId);
+        if (agentId != null) {
+            sysCallAgentMapper.enableAgentProfile(agentId);
+            return agentId;
+        }
+        String newAgentId = stableId("agent_profile:" + userId);
+        sysCallAgentMapper.insertAgentProfile(newAgentId, userId, "A" + newAgentId.substring(0, 6));
+        return newAgentId;
+    }
+
+    private String stableId(String value) {
+        return UUID.nameUUIDFromBytes(value.getBytes()).toString().replace("-", "");
+    }
+
     /**
      *   删除指定角色的用户关系
      * @param

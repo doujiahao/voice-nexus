@@ -44,6 +44,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> handleEvent(String fsCallId, CallEventDTO event) {
+        log.info("[CallEvent] 开始处理通话事件: fsCallId={}, eventType={}, endedBy={}, durationSec={}, metadata={}",
+                fsCallId, event.getEventType(), event.getEndedBy(), event.getDurationSec(), event.getMetadata());
         CallSession session = getByFsCallId(fsCallId);
         Map<String, Object> result = new HashMap<>();
 
@@ -66,34 +68,53 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
             eventLog.setDetail(JSON.toJSONString(event.getMetadata()));
         }
         callEventLogMapper.insert(eventLog);
+        log.info("[CallEvent] 已写入通话事件日志: fsCallId={}, sessionId={}, eventType={}, detail={}",
+                fsCallId, session.getId(), event.getEventType(), eventLog.getDetail());
 
         // 处理不同事件类型
         switch (event.getEventType()) {
             case "CALL_ENDED":
+                log.info("[CallEvent] 处理 CALL_ENDED: fsCallId={}, sessionId={}, agentId={}, endedBy={}, durationSec={}, metadata={}",
+                        fsCallId, session.getId(), session.getAgentId(), event.getEndedBy(), event.getDurationSec(), event.getMetadata());
                 endSession(session, event.getEndedBy(),
                         event.getMetadata() != null ? event.getMetadata().get("hangup_cause") : "NORMAL",
                         event.getDurationSec());
                 result.put("status", "ENDING");
                 break;
             case "ANSWERED":
+                log.info("[CallEvent] 处理 ANSWERED: fsCallId={}, sessionId={}, agentId={}, oldStatus={}",
+                        fsCallId, session.getId(), session.getAgentId(), session.getStatus());
                 session.setStatus("TALKING");
                 session.setAnswerTime(new Date());
                 updateById(session);
+                log.info("[CallEvent] 已更新会话为 TALKING: fsCallId={}, sessionId={}, agentId={}",
+                        fsCallId, session.getId(), session.getAgentId());
                 if (session.getAgentId() != null) {
                     AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
                     if (agent != null) {
+                        log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
+                                fsCallId, session.getId(), agent.getId(), agent.getUserId());
                         agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.TALKING, "通话接通");
+                    } else {
+                        log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
+                                fsCallId, session.getId(), session.getAgentId());
                     }
+                } else {
+                    log.warn("[CallEvent] 接通事件会话没有 agentId: fsCallId={}, sessionId={}", fsCallId, session.getId());
                 }
                 result.put("status", "TALKING");
                 break;
             default:
+                log.info("[CallEvent] 通话事件无需状态转换: fsCallId={}, sessionId={}, eventType={}, currentStatus={}",
+                        fsCallId, session.getId(), event.getEventType(), session.getStatus());
                 result.put("status", session.getStatus());
                 break;
         }
 
         result.put("acknowledged", true);
         result.put("call_session_id", session.getId());
+        log.info("[CallEvent] 通话事件处理完成: fsCallId={}, sessionId={}, eventType={}, result={}",
+                fsCallId, session.getId(), event.getEventType(), result);
         return result;
     }
 
@@ -109,21 +130,34 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void endSession(CallSession session, String endedBy, String hangupCause, Integer durationSec) {
+        log.info("[CallEvent] 准备结束会话: fsCallId={}, sessionId={}, agentId={}, endedBy={}, hangupCause={}, durationSec={}",
+                session.getFsCallId(), session.getId(), session.getAgentId(), endedBy, hangupCause, durationSec);
         session.setStatus("ENDED");
         session.setEndTime(new Date());
         session.setEndedBy(endedBy);
         session.setHangupCause(hangupCause);
         session.setDurationSec(durationSec);
         updateById(session);
+        log.info("[CallEvent] 已更新会话为 ENDED: fsCallId={}, sessionId={}, agentId={}, hangupCause={}",
+                session.getFsCallId(), session.getId(), session.getAgentId(), hangupCause);
 
         // 坐席恢复空闲
         if (session.getAgentId() != null) {
             AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
             if (agent != null) {
+                log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
+                        session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId());
                 agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
+            } else {
+                log.warn("[CallEvent] 结束会话找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
+                        session.getFsCallId(), session.getId(), session.getAgentId());
             }
+        } else {
+            log.info("[CallEvent] 结束会话无坐席可恢复: fsCallId={}, sessionId={}", session.getFsCallId(), session.getId());
         }
 
+        log.info("[CallEvent] 准备执行通话结束后处理: fsCallId={}, sessionId={}", session.getFsCallId(), session.getId());
         callEndProcessor.processCallEnd(session);
+        log.info("[CallEvent] 通话结束后处理完成: fsCallId={}, sessionId={}", session.getFsCallId(), session.getId());
     }
 }

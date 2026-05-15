@@ -4,7 +4,9 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.call.config.CallProperties;
+import org.jeecg.modules.call.entity.AgentProfile;
 import org.jeecg.modules.call.entity.CallSession;
+import org.jeecg.modules.call.mapper.AgentProfileMapper;
 import org.jeecg.modules.call.service.ICallContextService;
 import org.jeecg.modules.call.service.INlpOrchestrationService;
 import org.jeecg.modules.call.ws.CallWebSocket;
@@ -24,6 +26,8 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
     private CallProperties callProperties;
     @Autowired
     private ICallContextService callContextService;
+    @Autowired
+    private AgentProfileMapper agentProfileMapper;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -89,6 +93,11 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         if (session.getAgentId() == null) {
             return;
         }
+        AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+        if (agent == null || agent.getUserId() == null) {
+            log.warn("[NLP] 跳过坐席辅助推送，坐席用户不存在: sessionId={}, agentId={}", session.getId(), session.getAgentId());
+            return;
+        }
         JSONObject msg = new JSONObject();
         msg.put("type", "agent_assist");
         msg.put("call_session_id", session.getId());
@@ -101,7 +110,7 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         msg.put("suggested_reply", data.getString("suggested_reply"));
         msg.put("suggested_followup_questions", data.getJSONArray("suggested_followup_questions"));
         msg.put("task_suggestion", data.getJSONObject("task_suggestion"));
-        CallWebSocket.sendMessage(session.getAgentId(), msg.toJSONString());
+        CallWebSocket.sendMessage(agent.getUserId(), msg.toJSONString());
     }
 
     private JSONObject callGateway(String url, JSONObject body) {

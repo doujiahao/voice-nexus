@@ -60,7 +60,9 @@ public class CallWsMessageHandler {
         String action = msg.getString("action");
 
         if ("accept".equals(action)) {
+            log.info("[CallWS] 坐席接听来电: userId={}, callId={}, msg={}", userId, callId, msg);
             callSessionService.updateStatus(callId, "TALKING");
+            log.info("[CallWS] 已更新会话为 TALKING: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.TALKING, "坐席接听");
             CallWebSocket.pushCallState(userId, "active");
             CallWebSocket.pushCallSession(userId, callId);
@@ -73,35 +75,47 @@ public class CallWsMessageHandler {
                     String fsCallId = session.getFsCallId();
                     String extension = agent.getExtension();
                     String rtmpUrl = buildRtmpUrl(callId);
+                    log.info("[CallWS] 准备通知 FreeSwitch 桥接: userId={}, callId={}, fsCallId={}, extension={}, rtmpUrl={}",
+                            userId, callId, fsCallId, extension, rtmpUrl);
                     FreeSwitchClient.bridge(fsCallId, callId, extension);
+                    log.info("[CallWS] FreeSwitch 桥接调用完成: userId={}, callId={}, fsCallId={}, extension={}",
+                            userId, callId, fsCallId, extension);
                     FreeSwitchClient.startStreaming(fsCallId, callId, rtmpUrl);
+                    log.info("[CallWS] FreeSwitch 推流调用完成: userId={}, callId={}, fsCallId={}, rtmpUrl={}",
+                            userId, callId, fsCallId, rtmpUrl);
                 } else {
                     log.warn("【话务WS】坐席接听后未找到分机号: userId={}", userId);
                 }
             }
         } else if ("reject".equals(action)) {
-            // 通知 FreeSwitch 挂断
+            log.info("[CallWS] 坐席拒接来电: userId={}, callId={}, msg={}", userId, callId, msg);
             notifyFsHangup(callId, "REJECTED");
 
             callSessionService.updateStatus(callId, "QUEUING");
+            log.info("[CallWS] 已更新拒接会话为 QUEUING: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.ONLINE, "坐席拒接");
             CallWebSocket.pushCallState(userId, "idle");
         } else if ("hangup".equals(action)) {
-            // 通知 FreeSwitch 挂断
+            log.info("[CallWS] 坐席挂断通话: userId={}, callId={}, msg={}", userId, callId, msg);
             notifyFsHangup(callId, "NORMAL_CLEARING");
 
             callSessionService.updateStatus(callId, "ENDED");
+            log.info("[CallWS] 已更新挂断会话为 ENDED: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.WRAP_UP, "坐席挂断");
             CallWebSocket.pushCallState(userId, "idle");
+        } else {
+            log.warn("[CallWS] 未知来电响应动作: userId={}, callId={}, action={}, msg={}", userId, callId, action, msg);
         }
     }
 
     private static void notifyFsHangup(String callId, String cause) {
+        log.info("[CallWS] 准备通知 FreeSwitch 挂断: callId={}, cause={}", callId, cause);
         CallSession session = callSessionService.getById(callId);
         if (session != null && session.getFsCallId() != null) {
             FreeSwitchClient.hangup(session.getFsCallId(), callId, cause);
+            log.info("[CallWS] FreeSwitch 挂断调用完成: callId={}, fsCallId={}, cause={}", callId, session.getFsCallId(), cause);
         } else {
-            log.warn("【话务WS】挂断时未找到通话会话或 fsCallId: callId={}", callId);
+            log.warn("【话务WS】挂断时未找到通话会话或 fsCallId: callId={}, session={}", callId, session);
         }
     }
 
@@ -118,8 +132,14 @@ public class CallWsMessageHandler {
         String status = msg.getString("status");
         AgentStatusEnum statusEnum = mapFrontendStatus(status);
         if (statusEnum != null) {
+            log.info("[CallWS] 坐席手动切换状态: userId={}, frontendStatus={}, targetStatus={}",
+                    userId, status, statusEnum.getCode());
             agentProfileService.changeStatus(userId, statusEnum, "坐席手动切换");
             CallWebSocket.pushAgentStatus(userId, status);
+            log.info("[CallWS] 坐席手动切换状态完成: userId={}, frontendStatus={}, targetStatus={}",
+                    userId, status, statusEnum.getCode());
+        } else {
+            log.warn("[CallWS] 坐席手动切换状态失败，未知前端状态: userId={}, frontendStatus={}, msg={}", userId, status, msg);
         }
     }
 

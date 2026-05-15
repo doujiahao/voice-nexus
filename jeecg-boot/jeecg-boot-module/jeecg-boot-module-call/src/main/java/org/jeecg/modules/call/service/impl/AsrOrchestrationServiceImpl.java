@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.util.MinioUtil;
 import org.jeecg.modules.call.config.CallProperties;
+import org.jeecg.modules.call.entity.AgentProfile;
 import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.entity.CallTurn;
+import org.jeecg.modules.call.mapper.AgentProfileMapper;
 import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.mapper.CallTurnMapper;
 import org.jeecg.modules.call.service.IAsrOrchestrationService;
@@ -36,6 +38,8 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
     private CallTurnMapper callTurnMapper;
     @Autowired
     private CallSessionMapper callSessionMapper;
+    @Autowired
+    private AgentProfileMapper agentProfileMapper;
     @Autowired
     private ICallContextService callContextService;
     @Autowired
@@ -137,8 +141,13 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         if (session == null || session.getAgentId() == null) {
             return;
         }
+        AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+        if (agent == null || agent.getUserId() == null) {
+            log.warn("[ASR] 跳过前端推送，坐席用户不存在: sessionId={}, agentId={}", session.getId(), session.getAgentId());
+            return;
+        }
         CallWebSocket.pushAsrResult(
-                session.getAgentId(),
+                agent.getUserId(),
                 turn.getCorrectedText() != null ? turn.getCorrectedText() : turn.getText(),
                 turn.getSpeakerRole(),
                 data.getString("speaker_name"),

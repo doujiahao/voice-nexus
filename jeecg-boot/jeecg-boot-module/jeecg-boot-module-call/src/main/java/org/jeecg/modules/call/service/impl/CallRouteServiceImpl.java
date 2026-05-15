@@ -49,9 +49,11 @@ public class CallRouteServiceImpl implements ICallRouteService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public RouteResponseDTO route(String fsCallId, RouteRequestDTO request) {
-        log.info("[Route] 开始呼入路由: fsCallId={}, customerPhone={}, calledNumber={}, skillGroup={}",
-                fsCallId, request.getCustomerPhone(), request.getCalledNumber(), request.getSkillGroup());
+        log.info("[Route] 开始呼入路由: fsCallId={}, customerPhone={}, calledNumber={}, rawSkillGroup={}, metadata={}",
+                fsCallId, request.getCustomerPhone(), request.getCalledNumber(), request.getSkillGroup(), request.getFsMetadata());
         String skillGroupCode = normalizeSkillGroup(request.getSkillGroup());
+        log.info("[Route] 技能组参数归一化: fsCallId={}, rawSkillGroup={}, normalizedSkillGroup={}",
+                fsCallId, request.getSkillGroup(), skillGroupCode);
         SkillGroup skillGroup = skillGroupMapper.selectOne(
                 new LambdaQueryWrapper<SkillGroup>()
                         .eq(SkillGroup::getEnabled, 1)
@@ -65,7 +67,9 @@ public class CallRouteServiceImpl implements ICallRouteService {
             log.warn("[Route] 技能组不存在或未启用: fsCallId={}, skillGroup={}", fsCallId, skillGroupCode);
             return buildError("SKILL_GROUP_NOT_FOUND", "技能组不存在: " + skillGroupCode);
         }
-        log.info("[Route] 命中技能组: fsCallId={}, skillGroupId={}, groupCode={}", fsCallId, skillGroup.getId(), skillGroup.getGroupCode());
+        log.info("[Route] 命中技能组: fsCallId={}, skillGroupId={}, groupCode={}, enabled={}, queueMaxSize={}, queueTimeoutSec={}, ringTimeoutSec={}",
+                fsCallId, skillGroup.getId(), skillGroup.getGroupCode(), skillGroup.getEnabled(),
+                skillGroup.getQueueMaxSize(), skillGroup.getQueueTimeoutSec(), skillGroup.getRingTimeoutSec());
 
         Customer customer = matchCustomer(request.getCustomerPhone());
         if (customer == null) {
@@ -90,14 +94,20 @@ public class CallRouteServiceImpl implements ICallRouteService {
                 fsCallId, session.getId(), session.getStatus(), skillGroup.getId());
 
         String lockKey = LOCK_PREFIX + skillGroup.getId();
+        log.info("[Route] 尝试获取技能组路由锁: fsCallId={}, sessionId={}, skillGroupId={}, lockKey={}",
+                fsCallId, session.getId(), skillGroup.getId(), lockKey);
         Boolean locked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", 10, TimeUnit.SECONDS);
+        log.info("[Route] 技能组路由锁结果: fsCallId={}, sessionId={}, skillGroupId={}, locked={}",
+                fsCallId, session.getId(), skillGroup.getId(), locked);
         if (locked == null || !locked) {
             log.warn("[Route] 技能组路由锁竞争失败，进入排队: fsCallId={}, sessionId={}, skillGroupId={}",
                     fsCallId, session.getId(), skillGroup.getId());
             return buildQueueResponse(session, skillGroup);
         }
         try {
-            AgentProfile agent = findAvailableAgent(skillGroup.getId());
+            log.info("[Route] 开始查找可用坐席: fsCallId={}, sessionId={}, skillGroupId={}",
+                    fsCallId, session.getId(), skillGroup.getId());
+            AgentProfile agent = findAvailableAgent(skillGroup.getId(), fsCallId, session.getId());
             if (agent == null) {
                 int queueSize = callQueueService.getQueueSize(skillGroup.getId());
                 log.warn("[Route] 无可用在线坐席: fsCallId={}, sessionId={}, skillGroupId={}, queueSize={}, queueMaxSize={}",
@@ -119,15 +129,21 @@ public class CallRouteServiceImpl implements ICallRouteService {
             session.setRingTime(new Date());
             callSessionMapper.updateById(session);
 
+            log.info("[Route] 准备更新坐席状态为振铃: fsCallId={}, sessionId={}, agentId={}, agentUserId={}, oldStatus={}",
+                    fsCallId, session.getId(), agent.getId(), agent.getUserId(), agent.getStatus());
             agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
-            log.info("[Route] 准备推送来电弹窗: fsCallId={}, sessionId={}, agentUserId={}, phone={}",
-                    fsCallId, session.getId(), agent.getUserId(), request.getCustomerPhone());
+            log.info("[Route] 坐席状态已更新为振铃: fsCallId={}, sessionId={}, agentId={}, agentUserId={}",
+                    fsCallId, session.getId(), agent.getId(), agent.getUserId());
+            log.info("[Route] 准备推送来电弹窗: fsCallId={}, sessionId={}, agentId={}, agentUserId={}, extension={}, phone={}",
+                    fsCallId, session.getId(), agent.getId(), agent.getUserId(), agent.getExtension(), request.getCustomerPhone());
             CallWebSocket.pushIncomingCall(
                     agent.getUserId(),
                     session.getId(),
                     request.getCustomerPhone(),
                     customer != null ? customer.getName() : null,
                     fsCallId);
+            log.info("[Route] 来电弹窗推送调用完成: fsCallId={}, sessionId={}, agentId={}, agentUserId={}",
+                    fsCallId, session.getId(), agent.getId(), agent.getUserId());
 
             // 7. 构建响应
             RouteResponseDTO resp = new RouteResponseDTO();
@@ -148,6 +164,8 @@ public class CallRouteServiceImpl implements ICallRouteService {
             return resp;
         } finally {
             redisTemplate.delete(lockKey);
+            log.info("[Route] 已释放技能组路由锁: fsCallId={}, sessionId={}, skillGroupId={}, lockKey={}",
+                    fsCallId, session.getId(), skillGroup.getId(), lockKey);
         }
     }
 
@@ -158,32 +176,43 @@ public class CallRouteServiceImpl implements ICallRouteService {
         return skillGroup.trim();
     }
 
-    private AgentProfile findAvailableAgent(String skillGroupId) {
+    private AgentProfile findAvailableAgent(String skillGroupId, String fsCallId, String sessionId) {
         List<SkillGroupAgent> agents = skillGroupAgentMapper.selectList(
                 new LambdaQueryWrapper<SkillGroupAgent>()
                         .eq(SkillGroupAgent::getSkillGroupId, skillGroupId)
                         .orderByDesc(SkillGroupAgent::getSkillLevel));
-        log.info("[Route] 查询候选坐席: skillGroupId={}, candidateCount={}", skillGroupId, agents.size());
+        log.info("[Route] 查询候选坐席: fsCallId={}, sessionId={}, skillGroupId={}, candidateCount={}",
+                fsCallId, sessionId, skillGroupId, agents.size());
 
         for (SkillGroupAgent sga : agents) {
+            log.info("[Route] 检查技能组坐席关系: fsCallId={}, sessionId={}, skillGroupId={}, skillGroupAgentId={}, agentId={}, skillLevel={}",
+                    fsCallId, sessionId, skillGroupId, sga.getId(), sga.getAgentId(), sga.getSkillLevel());
             AgentProfile profile = agentProfileMapper.selectById(sga.getAgentId());
             if (profile == null) {
-                log.warn("[Route] 技能组坐席关联无效: skillGroupId={}, skillGroupAgentId={}, agentId={}",
-                        skillGroupId, sga.getId(), sga.getAgentId());
+                log.warn("[Route] 技能组坐席关联无效: fsCallId={}, sessionId={}, skillGroupId={}, skillGroupAgentId={}, agentId={}",
+                        fsCallId, sessionId, skillGroupId, sga.getId(), sga.getAgentId());
                 continue;
             }
             boolean online = CallWebSocket.isOnline(profile.getUserId());
-            log.info("[Route] 候选坐席: skillGroupId={}, agentId={}, userId={}, extension={}, status={}, wsOnline={}",
-                    skillGroupId, profile.getId(), profile.getUserId(), profile.getExtension(), profile.getStatus(), online);
+            log.info("[Route] 候选坐席详情: fsCallId={}, sessionId={}, skillGroupId={}, agentId={}, userId={}, agentNo={}, extension={}, status={}, wsOnline={}",
+                    fsCallId, sessionId, skillGroupId, profile.getId(), profile.getUserId(), profile.getAgentNo(),
+                    profile.getExtension(), profile.getStatus(), online);
             if (!AgentStatusEnum.ONLINE.getCode().equals(profile.getStatus())) {
+                log.info("[Route] 跳过坐席，状态不是 ONLINE: fsCallId={}, sessionId={}, agentId={}, userId={}, status={}",
+                        fsCallId, sessionId, profile.getId(), profile.getUserId(), profile.getStatus());
                 continue;
             }
             if (!online) {
-                log.info("[Route] 坐席状态为空闲但 WS 不在线，跳过分配: agentId={}, userId={}", profile.getId(), profile.getUserId());
+                log.info("[Route] 跳过坐席，WS 不在线: fsCallId={}, sessionId={}, agentId={}, userId={}, extension={}",
+                        fsCallId, sessionId, profile.getId(), profile.getUserId(), profile.getExtension());
                 continue;
             }
+            log.info("[Route] 选中可用坐席: fsCallId={}, sessionId={}, agentId={}, userId={}, extension={}",
+                    fsCallId, sessionId, profile.getId(), profile.getUserId(), profile.getExtension());
             return profile;
         }
+        log.warn("[Route] 未找到可用坐席: fsCallId={}, sessionId={}, skillGroupId={}, candidateCount={}",
+                fsCallId, sessionId, skillGroupId, agents.size());
         return null;
     }
 
