@@ -74,6 +74,10 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
             ResponseEntity<String> response = restTemplate.exchange(gatewayUrl, HttpMethod.POST, entity, String.class);
             result = JSON.parseObject(response.getBody());
         } catch (Exception e) {
+            if (isEmptyTextResponse(e)) {
+                log.debug("[ASR] 空音频识别结果已跳过: sessionId={}, path={}", sessionId, audioPath);
+                return;
+            }
             log.error("[ASR] Gateway 调用失败: sessionId={}", sessionId, e);
             return;
         }
@@ -142,6 +146,11 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
                 turn.getId(),
                 turn.getDurationMs()
         );
+    }
+
+    private boolean isEmptyTextResponse(Exception e) {
+        String message = e.getMessage();
+        return message != null && message.contains("empty text");
     }
 
     private byte[] downloadFromMinio(String objectPath) {

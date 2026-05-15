@@ -38,7 +38,9 @@ public class AudioPipelineServiceImpl implements IAudioPipelineService {
         boolean isLast = frame.getIsLast();
         byte[] audioData = frame.getData().toByteArray();
 
-        if (audioData.length == 0) {
+        if (isEmptyAudio(audioData)) {
+            log.debug("[AudioPipeline] 空音频帧已跳过: sessionId={}, speakerId={}, sequence={}",
+                    sessionId, speakerId, frame.getSequenceNumber());
             return;
         }
 
@@ -53,6 +55,38 @@ public class AudioPipelineServiceImpl implements IAudioPipelineService {
         if (isLast) {
             triggerAsr(sessionId, objectPath, speakerId, speakerName, speakerRole);
         }
+    }
+
+    private boolean isEmptyAudio(byte[] audioData) {
+        if (audioData.length == 0) {
+            return true;
+        }
+        int dataOffset = findWavDataOffset(audioData);
+        if (dataOffset < 0) {
+            return false;
+        }
+        for (int i = dataOffset; i < audioData.length; i++) {
+            if (audioData[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int findWavDataOffset(byte[] audioData) {
+        for (int i = 12; i <= audioData.length - 8; i++) {
+            if (audioData[i] == 'd' && audioData[i + 1] == 'a' && audioData[i + 2] == 't' && audioData[i + 3] == 'a') {
+                int dataSize = (audioData[i + 4] & 0xff)
+                        | ((audioData[i + 5] & 0xff) << 8)
+                        | ((audioData[i + 6] & 0xff) << 16)
+                        | ((audioData[i + 7] & 0xff) << 24);
+                if (dataSize <= 0) {
+                    return audioData.length;
+                }
+                return i + 8;
+            }
+        }
+        return -1;
     }
 
     private String buildObjectPath(String sessionId, String speakerId) {
