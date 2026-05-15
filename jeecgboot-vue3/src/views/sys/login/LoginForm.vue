@@ -8,8 +8,8 @@
       <InputPassword size="large" visibilityToggle v-model:value="formData.password" :placeholder="t('sys.login.password')" />
     </FormItem>
 
-    <!--验证码-->
-    <ARow class="enter-x">
+    <!--验证码暂时屏蔽-->
+    <!-- <ARow class="enter-x">
       <ACol :span="12">
         <FormItem name="inputCode" class="enter-x">
           <Input size="large" v-model:value="formData.inputCode" :placeholder="t('sys.login.inputCode')" style="min-width: 100px" />
@@ -26,7 +26,7 @@
           <img v-else style="margin-top: 2px; max-width: initial" src="../../../assets/images/checkcode.png" @click="handleChangeCheckCode" />
         </FormItem>
       </ACol>
-    </ARow>
+    </ARow> -->
 
     <ARow class="enter-x">
       <ACol :span="12">
@@ -150,8 +150,8 @@
         toRaw({
           password: encryptedPassword,
           username: data.account,
-          captcha: data.inputCode,
-          checkKey: randCodeData.checkKey,
+          captcha: '',
+          checkKey: '',
           mode: 'none', //不要默认的错误提示
         })
       );

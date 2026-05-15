@@ -20,4 +20,25 @@ export const AI_ROUTE: AppRouteRecordRaw = {
   ],
 };
 
-export const staticRoutesList = [AI_ROUTE];
+export const CALL_ROUTE: AppRouteRecordRaw = {
+  path: '/call',
+  name: 'CallWorkspace',
+  component: LAYOUT,
+  meta: {
+    title: '话务工作台',
+    hideMenu: true,
+  },
+  children: [
+    {
+      path: 'workspace',
+      name: 'CallWorkspaceIndex',
+      component: () => import('/@/views/call/index.vue'),
+      meta: {
+        title: '坐席工作台',
+        hideMenu: true,
+      },
+    },
+  ],
+};
+
+export const staticRoutesList = [AI_ROUTE, CALL_ROUTE];

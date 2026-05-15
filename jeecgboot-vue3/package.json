@@ -185,5 +185,14 @@
   "homepage": "https://www.jeecg.com",
   "engines": {
     "node": "^18 || >=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@scarf/scarf",
+      "core-js",
+      "esbuild",
+      "less",
+      "vue-demi"
+    ]
   }
 }
