@@ -5,6 +5,7 @@ import type { IncomingCallData } from '../types'
 const _incomingCall  = ref<IncomingCallData | null>(null)
 const _queue: IncomingCallData[] = []
 const _acceptedCall  = ref<IncomingCallData | null>(null)
+const _answeredCall  = ref<IncomingCallData | null>(null)
 const _autoRejected  = ref(false)
 const _rejectedFromRinging = ref(false)
 const RING_TIMEOUT_MS = 30_000
@@ -55,6 +56,43 @@ function _handleIncomingCall(msg: Record<string, unknown>): void {
   }
 }
 
+function _matchesCall(msg: Record<string, unknown>) {
+  const callId = String(msg.call_id ?? '')
+  const fsCallId = String(msg.fs_call_id ?? '')
+  return (call: IncomingCallData) => (callId && call.callId === callId) || (fsCallId && call.fsCallId === fsCallId)
+}
+
+function _handleIncomingCallCancelled(msg: Record<string, unknown>): void {
+  console.log('[CallNotify] 收到来电取消 WS 消息:', msg)
+  const matches = _matchesCall(msg)
+
+  if (_incomingCall.value && matches(_incomingCall.value)) {
+    _rejectedFromRinging.value = true
+    _next()
+    return
+  }
+
+  const index = _queue.findIndex(matches)
+  if (index >= 0) _queue.splice(index, 1)
+}
+
+function _handleIncomingCallAnswered(msg: Record<string, unknown>): void {
+  console.log('[CallNotify] 收到来电接听 WS 消息:', msg)
+  const matches = _matchesCall(msg)
+
+  if (_incomingCall.value && matches(_incomingCall.value)) {
+    _answeredCall.value = _incomingCall.value
+    _next()
+    return
+  }
+
+  const index = _queue.findIndex(matches)
+  if (index >= 0) {
+    _answeredCall.value = _queue[index]
+    _queue.splice(index, 1)
+  }
+}
+
 export function useCallNotify() {
   const javaWs = useJavaWs()
   _javaWsRef = javaWs
@@ -63,6 +101,8 @@ export function useCallNotify() {
     if (_initialized) return
     _initialized = true
     javaWs.subscribe('incoming_call', _handleIncomingCall as any)
+    javaWs.subscribe('incoming_call_cancelled', _handleIncomingCallCancelled as any)
+    javaWs.subscribe('incoming_call_answered', _handleIncomingCallAnswered as any)
   }
 
   function accept(): void {
@@ -90,6 +130,10 @@ export function useCallNotify() {
     _acceptedCall.value = null
   }
 
+  function clearAnswered(): void {
+    _answeredCall.value = null
+  }
+
   function clearAutoRejected(): void {
     _autoRejected.value = false
   }
@@ -101,12 +145,14 @@ export function useCallNotify() {
   return {
     incomingCall: readonly(_incomingCall),
     acceptedCall: readonly(_acceptedCall),
+    answeredCall: readonly(_answeredCall),
     autoRejected: readonly(_autoRejected),
     rejectedFromRinging: readonly(_rejectedFromRinging),
     init,
     accept,
     reject,
     clearAccepted,
+    clearAnswered,
     clearAutoRejected,
     clearRejectedFromRinging,
   }

@@ -190,6 +190,25 @@ public class CallWebSocket {
         log.info("[CallWS] 推送来电结束: agentUserId={}, callId={}, fsCallId={}", agentUserId, callId, fsCallId);
     }
 
+    public static void pushIncomingCallCancelled(String agentUserId, String callId, String fsCallId, String reason) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "incoming_call_cancelled");
+        msg.put("call_id", callId);
+        msg.put("fs_call_id", fsCallId);
+        msg.put("reason", reason);
+        sendMessage(agentUserId, msg.toJSONString());
+        log.info("[CallWS] 推送来电取消: agentUserId={}, callId={}, fsCallId={}, reason={}", agentUserId, callId, fsCallId, reason);
+    }
+
+    public static void pushIncomingCallAnswered(String agentUserId, String callId, String fsCallId) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "incoming_call_answered");
+        msg.put("call_id", callId);
+        msg.put("fs_call_id", fsCallId);
+        sendMessage(agentUserId, msg.toJSONString());
+        log.info("[CallWS] 推送来电接听: agentUserId={}, callId={}, fsCallId={}", agentUserId, callId, fsCallId);
+    }
+
     public static void pushCallSession(String agentUserId, String callSessionId) {
         JSONObject msg = new JSONObject();
         msg.put("type", "call_session");

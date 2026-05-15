@@ -234,7 +234,7 @@ const {
 const callSessionId = ref('')
 
 // ── 来电通知 ──────────────────────────────────────────────────────────────────
-const { acceptedCall, autoRejected, rejectedFromRinging, incomingCall, clearAccepted, clearAutoRejected, clearRejectedFromRinging } = useCallNotify()
+const { acceptedCall, answeredCall, autoRejected, rejectedFromRinging, incomingCall, clearAccepted, clearAnswered, clearAutoRejected, clearRejectedFromRinging } = useCallNotify()
 const hasIncomingCall = computed(() => incomingCall.value !== null && !isCallActive.value)
 
 // 来电到达 → 推断坐席振铃状态（后端路由分配 RINGING 不推送 agent_status）
@@ -248,6 +248,14 @@ watch(acceptedCall, async (call) => {
   phoneNumber.value = call.phone
   await acceptCall()
   clearAccepted()
+})
+
+watch(answeredCall, async (call) => {
+  if (!call) return
+  callerName.value  = call.callerName
+  phoneNumber.value = call.phone
+  await acceptCall()
+  clearAnswered()
 })
 
 watch(autoRejected, (rejected) => {

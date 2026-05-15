@@ -15,6 +15,7 @@ import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.service.IAgentProfileService;
 import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallSessionService;
+import org.jeecg.modules.call.ws.CallWebSocket;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,6 +100,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                     result.put("status", session.getStatus());
                     break;
                 }
+                String previousStatus = session.getStatus();
                 session.setStatus("TALKING");
                 session.setAnswerTime(new Date());
                 updateById(session);
@@ -106,9 +108,15 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                         fsCallId, session.getId(), session.getAgentId());
                 AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
                 if (agent != null) {
-                    log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
-                            fsCallId, session.getId(), agent.getId(), agent.getUserId());
+                    log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}, previousStatus={}",
+                            fsCallId, session.getId(), agent.getId(), agent.getUserId(), previousStatus);
                     agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.TALKING, "通话接通");
+                    if ("RINGING".equals(previousStatus)) {
+                        CallWebSocket.pushIncomingCallAnswered(agent.getUserId(), session.getId(), session.getFsCallId());
+                    }
+                    CallWebSocket.pushCallSession(agent.getUserId(), session.getId());
+                    CallWebSocket.pushAgentStatus(agent.getUserId(), "on_call");
+                    CallWebSocket.pushCallState(agent.getUserId(), "active");
                 } else {
                     log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                             fsCallId, session.getId(), session.getAgentId());
@@ -143,6 +151,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     public void endSession(CallSession session, String endedBy, String hangupCause, Integer durationSec) {
         log.info("[CallEvent] 准备结束会话: fsCallId={}, sessionId={}, agentId={}, endedBy={}, hangupCause={}, durationSec={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), endedBy, hangupCause, durationSec);
+        String previousStatus = session.getStatus();
         session.setStatus("ENDED");
         session.setEndTime(new Date());
         session.setEndedBy(endedBy);
@@ -152,14 +161,23 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         log.info("[CallEvent] 已更新会话为 ENDED: fsCallId={}, sessionId={}, agentId={}, hangupCause={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), hangupCause);
         removeFromQueueIfNeeded(session);
+        pushIncomingCancelledIfRinging(session, previousStatus, hangupCause);
 
         // 坐席恢复空闲
         if (session.getAgentId() != null) {
             AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
             if (agent != null) {
-                log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
-                        session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId());
-                agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
+                log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}, previousStatus={}",
+                        session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId(), previousStatus);
+                if ("RINGING".equals(previousStatus)) {
+                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, "来电取消");
+                    CallWebSocket.pushAgentStatus(agent.getUserId(), "idle");
+                    CallWebSocket.pushCallState(agent.getUserId(), "idle");
+                } else {
+                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
+                    CallWebSocket.pushAgentStatus(agent.getUserId(), "wrap_up");
+                    CallWebSocket.pushCallState(agent.getUserId(), "idle");
+                }
             } else {
                 log.warn("[CallEvent] 结束会话找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                         session.getFsCallId(), session.getId(), session.getAgentId());
@@ -180,5 +198,18 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         callQueueService.remove(session.getSkillGroupId(), session.getId());
         log.info("[CallEvent] 已清理排队队列: fsCallId={}, sessionId={}, skillGroupId={}",
                 session.getFsCallId(), session.getId(), session.getSkillGroupId());
+    }
+
+    private void pushIncomingCancelledIfRinging(CallSession session, String previousStatus, String hangupCause) {
+        if (!"RINGING".equals(previousStatus) || session.getAgentId() == null) {
+            return;
+        }
+        AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+        if (agent == null || agent.getUserId() == null) {
+            log.warn("[CallEvent] 来电取消通知跳过，找不到坐席用户: fsCallId={}, sessionId={}, agentId={}",
+                    session.getFsCallId(), session.getId(), session.getAgentId());
+            return;
+        }
+        CallWebSocket.pushIncomingCallCancelled(agent.getUserId(), session.getId(), session.getFsCallId(), hangupCause);
     }
 }
