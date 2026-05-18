@@ -53,6 +53,60 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         CallSession session = getByFsCallId(fsCallId);
         Map<String, Object> result = new HashMap<>();
 
+        // RINGING 事件：创建 CallSession（如果不存在）
+        if ("RINGING".equals(event.getEventType())) {
+            if (session == null) {
+                session = new CallSession();
+                session.setFsCallId(fsCallId);
+                session.setDirection("INBOUND");
+                session.setStatus("RINGING");
+                if (event.getMetadata() != null) {
+                    session.setCustomerPhone(event.getMetadata().get("customerPhone"));
+                    session.setCalledNumber(event.getMetadata().get("calledNumber"));
+                    session.setSkillGroupId(event.getMetadata().get("skillGroupId"));
+                    session.setAgentId(event.getMetadata().get("agentId"));
+                }
+                session.setRingTime(new Date());
+                session.setQueueEnterTime(new Date());
+                save(session);
+                log.info("[CallEvent] RINGING 创建呼入会话: fsCallId={}, sessionId={}, agentId={}",
+                        fsCallId, session.getId(), session.getAgentId());
+            }
+
+            // 更新坐席状态为 RINGING
+            if (session.getAgentId() != null) {
+                AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+                if (agent != null) {
+                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
+                    // 推送来电弹窗
+                    CallWebSocket.pushIncomingCall(
+                            agent.getUserId(),
+                            session.getId(),
+                            session.getCustomerPhone(),
+                            null,
+                            fsCallId);
+                    log.info("[CallEvent] RINGING 已推送来电弹窗: fsCallId={}, sessionId={}, agentUserId={}",
+                            fsCallId, session.getId(), agent.getUserId());
+                }
+            }
+
+            // 记录事件日志
+            CallEventLog eventLog = new CallEventLog();
+            eventLog.setSessionId(session.getId());
+            eventLog.setEventType(event.getEventType());
+            eventLog.setEventTime(new Date());
+            eventLog.setOperatorType("FSS");
+            if (event.getMetadata() != null) {
+                eventLog.setDetail(JSON.toJSONString(event.getMetadata()));
+            }
+            callEventLogMapper.insert(eventLog);
+
+            result.put("status", "RINGING");
+            result.put("acknowledged", true);
+            result.put("call_session_id", session.getId());
+            return result;
+        }
+
         if (session == null) {
             log.warn("[Inbound] 通话事件找不到会话: fsCallId={}, eventType={}", fsCallId, event.getEventType());
             result.put("acknowledged", false);

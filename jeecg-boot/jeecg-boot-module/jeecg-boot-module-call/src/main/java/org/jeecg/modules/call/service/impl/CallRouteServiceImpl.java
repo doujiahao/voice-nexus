@@ -7,7 +7,6 @@ import org.jeecg.modules.call.dto.RouteResponseDTO;
 import org.jeecg.modules.call.entity.*;
 import org.jeecg.modules.call.enums.AgentStatusEnum;
 import org.jeecg.modules.call.mapper.*;
-import org.jeecg.modules.call.service.IAgentProfileService;
 import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallRouteService;
 import org.jeecg.modules.call.ws.CallWebSocket;
@@ -39,8 +38,6 @@ public class CallRouteServiceImpl implements ICallRouteService {
     private CustomerMapper customerMapper;
     @Autowired
     private CustomerContactMapper customerContactMapper;
-    @Autowired
-    private IAgentProfileService agentProfileService;
     @Autowired
     private ICallQueueService callQueueService;
     @Autowired
@@ -78,77 +75,42 @@ public class CallRouteServiceImpl implements ICallRouteService {
             log.info("[Route] 匹配到客户: fsCallId={}, customerId={}, customerName={}", fsCallId, customer.getId(), customer.getName());
         }
 
-        CallSession session = new CallSession();
-        session.setFsCallId(fsCallId);
-        session.setDirection("INBOUND");
-        session.setStatus("QUEUING");
-        session.setCustomerPhone(request.getCustomerPhone());
-        session.setCalledNumber(request.getCalledNumber());
-        session.setSkillGroupId(skillGroup.getId());
-        session.setQueueEnterTime(new Date());
-        if (customer != null) {
-            session.setCustomerId(customer.getId());
-        }
-        callSessionMapper.insert(session);
-        log.info("[Route] 已创建呼入会话: fsCallId={}, sessionId={}, status={}, skillGroupId={}",
-                fsCallId, session.getId(), session.getStatus(), skillGroup.getId());
-
+        // 路由阶段不创建 CallSession，由 RINGING 事件创建
         String lockKey = LOCK_PREFIX + skillGroup.getId();
-        log.info("[Route] 尝试获取技能组路由锁: fsCallId={}, sessionId={}, skillGroupId={}, lockKey={}",
-                fsCallId, session.getId(), skillGroup.getId(), lockKey);
+        log.info("[Route] 尝试获取技能组路由锁: fsCallId={}, skillGroupId={}, lockKey={}",
+                fsCallId, skillGroup.getId(), lockKey);
         Boolean locked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", 10, TimeUnit.SECONDS);
-        log.info("[Route] 技能组路由锁结果: fsCallId={}, sessionId={}, skillGroupId={}, locked={}",
-                fsCallId, session.getId(), skillGroup.getId(), locked);
+        log.info("[Route] 技能组路由锁结果: fsCallId={}, skillGroupId={}, locked={}",
+                fsCallId, skillGroup.getId(), locked);
         if (locked == null || !locked) {
-            log.warn("[Route] 技能组路由锁竞争失败，进入排队: fsCallId={}, sessionId={}, skillGroupId={}",
-                    fsCallId, session.getId(), skillGroup.getId());
+            log.warn("[Route] 技能组路由锁竞争失败，进入排队: fsCallId={}, skillGroupId={}",
+                    fsCallId, skillGroup.getId());
+            CallSession session = createInboundSession(fsCallId, request, skillGroup, customer);
             return buildQueueResponse(session, skillGroup);
         }
         try {
-            log.info("[Route] 开始查找可用坐席: fsCallId={}, sessionId={}, skillGroupId={}",
-                    fsCallId, session.getId(), skillGroup.getId());
-            AgentProfile agent = findAvailableAgent(skillGroup.getId(), fsCallId, session.getId());
+            log.info("[Route] 开始查找可用坐席: fsCallId={}, skillGroupId={}",
+                    fsCallId, skillGroup.getId());
+            AgentProfile agent = findAvailableAgent(skillGroup.getId(), fsCallId, null);
             if (agent == null) {
                 int queueSize = callQueueService.getQueueSize(skillGroup.getId());
-                log.warn("[Route] 无可用在线坐席: fsCallId={}, sessionId={}, skillGroupId={}, queueSize={}, queueMaxSize={}",
-                        fsCallId, session.getId(), skillGroup.getId(), queueSize, skillGroup.getQueueMaxSize());
+                log.warn("[Route] 无可用在线坐席: fsCallId={}, skillGroupId={}, queueSize={}, queueMaxSize={}",
+                        fsCallId, skillGroup.getId(), queueSize, skillGroup.getQueueMaxSize());
                 if (queueSize >= skillGroup.getQueueMaxSize()) {
-                    session.setStatus("ENDED");
-                    session.setHangupCause("QUEUE_FULL");
-                    callSessionMapper.updateById(session);
-                    log.warn("[Route] 队列已满，结束会话: fsCallId={}, sessionId={}", fsCallId, session.getId());
+                    log.warn("[Route] 队列已满: fsCallId={}, skillGroupId={}", fsCallId, skillGroup.getId());
                     return buildError("QUEUE_FULL", "技能组无可用坐席且队列已满");
                 }
+                CallSession session = createInboundSession(fsCallId, request, skillGroup, customer);
                 return buildQueueResponse(session, skillGroup);
             }
 
-            log.info("[Route] 分配坐席: fsCallId={}, sessionId={}, agentId={}, agentUserId={}, extension={}",
-                    fsCallId, session.getId(), agent.getId(), agent.getUserId(), agent.getExtension());
-            session.setAgentId(agent.getId());
-            session.setStatus("RINGING");
-            session.setRingTime(new Date());
-            callSessionMapper.updateById(session);
+            log.info("[Route] 分配坐席: fsCallId={}, agentId={}, agentUserId={}, extension={}",
+                    fsCallId, agent.getId(), agent.getUserId(), agent.getExtension());
 
-            log.info("[Route] 准备更新坐席状态为振铃: fsCallId={}, sessionId={}, agentId={}, agentUserId={}, oldStatus={}",
-                    fsCallId, session.getId(), agent.getId(), agent.getUserId(), agent.getStatus());
-            agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
-            log.info("[Route] 坐席状态已更新为振铃: fsCallId={}, sessionId={}, agentId={}, agentUserId={}",
-                    fsCallId, session.getId(), agent.getId(), agent.getUserId());
-            log.info("[Route] 准备推送来电弹窗: fsCallId={}, sessionId={}, agentId={}, agentUserId={}, extension={}, phone={}",
-                    fsCallId, session.getId(), agent.getId(), agent.getUserId(), agent.getExtension(), request.getCustomerPhone());
-            CallWebSocket.pushIncomingCall(
-                    agent.getUserId(),
-                    session.getId(),
-                    request.getCustomerPhone(),
-                    customer != null ? customer.getName() : null,
-                    fsCallId);
-            log.info("[Route] 来电弹窗推送调用完成: fsCallId={}, sessionId={}, agentId={}, agentUserId={}",
-                    fsCallId, session.getId(), agent.getId(), agent.getUserId());
-
-            // 7. 构建响应
+            // 路由成功：只返回坐席信息，不创建 CallSession、不更新坐席状态、不推送来电弹窗
+            // 这些操作由 RINGING 事件处理
             RouteResponseDTO resp = new RouteResponseDTO();
             resp.setSuccess(true);
-            resp.setCallSessionId(session.getId());
             resp.setRouteAction("RING");
             resp.setTargetAgentId(agent.getId());
             resp.setTargetExtension(agent.getExtension());
@@ -164,9 +126,27 @@ public class CallRouteServiceImpl implements ICallRouteService {
             return resp;
         } finally {
             redisTemplate.delete(lockKey);
-            log.info("[Route] 已释放技能组路由锁: fsCallId={}, sessionId={}, skillGroupId={}, lockKey={}",
-                    fsCallId, session.getId(), skillGroup.getId(), lockKey);
+            log.info("[Route] 已释放技能组路由锁: fsCallId={}, skillGroupId={}, lockKey={}",
+                    fsCallId, skillGroup.getId(), lockKey);
         }
+    }
+
+    private CallSession createInboundSession(String fsCallId, RouteRequestDTO request, SkillGroup skillGroup, Customer customer) {
+        CallSession session = new CallSession();
+        session.setFsCallId(fsCallId);
+        session.setDirection("INBOUND");
+        session.setStatus("QUEUING");
+        session.setCustomerPhone(request.getCustomerPhone());
+        session.setCalledNumber(request.getCalledNumber());
+        session.setSkillGroupId(skillGroup.getId());
+        session.setQueueEnterTime(new Date());
+        if (customer != null) {
+            session.setCustomerId(customer.getId());
+        }
+        callSessionMapper.insert(session);
+        log.info("[Route] 已创建呼入排队会话: fsCallId={}, sessionId={}, status={}, skillGroupId={}",
+                fsCallId, session.getId(), session.getStatus(), skillGroup.getId());
+        return session;
     }
 
     private String normalizeSkillGroup(String skillGroup) {
