@@ -132,6 +132,18 @@ public class CallRouteServiceImpl implements ICallRouteService {
     }
 
     private CallSession createInboundSession(String fsCallId, RouteRequestDTO request, SkillGroup skillGroup, Customer customer) {
+        // 去重：同一 fsCallId 若已存在非 ENDED 的记录则复用，避免重路由/事件重发产生孤儿记录
+        CallSession existing = callSessionMapper.selectOne(
+                new LambdaQueryWrapper<CallSession>()
+                        .eq(CallSession::getFsCallId, fsCallId)
+                        .ne(CallSession::getStatus, "ENDED")
+                        .last("LIMIT 1"));
+        if (existing != null) {
+            log.info("[Route] 复用已有呼入会话: fsCallId={}, sessionId={}, status={}",
+                    fsCallId, existing.getId(), existing.getStatus());
+            return existing;
+        }
+
         CallSession session = new CallSession();
         session.setFsCallId(fsCallId);
         session.setDirection("INBOUND");

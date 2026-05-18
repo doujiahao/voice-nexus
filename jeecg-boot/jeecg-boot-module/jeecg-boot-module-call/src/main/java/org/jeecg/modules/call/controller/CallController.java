@@ -66,6 +66,8 @@ public class CallController {
         if (status != null && !"ALL".equals(status)) {
             wrapper.eq(CallSession::getStatus, status);
         }
+        // 过滤孤儿记录：status=QUEUING 且无任何 turn 的记录不展示
+        wrapper.and(w -> w.ne(CallSession::getStatus, "QUEUING").or().isNotNull(CallSession::getAgentId));
         wrapper.orderByDesc(CallSession::getCreateTime);
 
         Page<CallSession> pageResult = callSessionService.page(new Page<>(page, pageSize), wrapper);
