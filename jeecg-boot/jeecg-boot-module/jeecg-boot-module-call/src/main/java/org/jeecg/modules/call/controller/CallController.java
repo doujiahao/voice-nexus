@@ -284,4 +284,16 @@ public class CallController {
         callTagMapper.deleteById(tagId);
         return Result.OK("删除成功");
     }
+
+    @Operation(summary = "更新通话备注")
+    @PutMapping("/calls/{callSessionId}/remark")
+    public Result<?> updateRemark(@PathVariable String callSessionId, @RequestBody JSONObject body) {
+        CallSession session = callSessionService.getById(callSessionId);
+        if (session == null) {
+            return Result.error("通话记录不存在");
+        }
+        session.setRemark(body.getString("remark"));
+        callSessionService.updateById(session);
+        return Result.OK("备注更新成功");
+    }
 }

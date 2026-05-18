@@ -101,7 +101,7 @@ public class CallWsMessageHandler {
 
             callSessionService.updateStatus(callId, "ENDED");
             log.info("[CallWS] 已更新挂断会话为 ENDED: userId={}, callId={}", userId, callId);
-            agentProfileService.changeStatus(userId, AgentStatusEnum.WRAP_UP, "坐席挂断");
+            agentProfileService.changeStatus(userId, AgentStatusEnum.ONLINE, "坐席挂断");
             CallWebSocket.pushCallState(userId, "idle");
         } else {
             log.warn("[CallWS] 未知来电响应动作: userId={}, callId={}, action={}, msg={}", userId, callId, action, msg);

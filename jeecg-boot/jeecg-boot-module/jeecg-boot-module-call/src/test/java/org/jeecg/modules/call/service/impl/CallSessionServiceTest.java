@@ -140,7 +140,7 @@ class CallSessionServiceTest {
         assertEquals("CUSTOMER", session.getEndedBy());
         assertEquals(120, session.getDurationSec());
 
-        verify(agentProfileService).changeStatus("user-001", AgentStatusEnum.WRAP_UP, "通话结束");
+        verify(agentProfileService).changeStatus("user-001", AgentStatusEnum.ONLINE, "通话结束");
         verify(callQueueService).remove("skill-001", "sess-001");
         verify(callEndProcessor).processCallEnd(session);
     }

@@ -9,6 +9,7 @@ import org.jeecg.modules.call.entity.AgentProfile;
 import org.jeecg.modules.call.entity.CallEventLog;
 import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.enums.AgentStatusEnum;
+import org.jeecg.modules.call.ws.CallWebSocket;
 import org.jeecg.modules.call.mapper.AgentProfileMapper;
 import org.jeecg.modules.call.mapper.CallEventLogMapper;
 import org.jeecg.modules.call.mapper.CallSessionMapper;
@@ -159,7 +160,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
             if (agent != null) {
                 log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
                         session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId());
-                agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
+                agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, "通话结束");
+                    CallWebSocket.pushCallState(agent.getUserId(), "idle");
             } else {
                 log.warn("[CallEvent] 结束会话找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                         session.getFsCallId(), session.getId(), session.getAgentId());
