@@ -175,6 +175,20 @@ public class CallWebSocket {
         }
     }
 
+    public static void pushIncomingCallPending(String agentUserId, String callId, String phone, String callerName, String fsCallId) {
+        Session session = SESSION_POOL.get(agentUserId);
+        log.info("[CallWS] 推送来电预告: agentUserId={}, callId={}, phone={}, callerName={}, fsCallId={}, online={}, sessionId={}, onlineUsers={}",
+                agentUserId, callId, phone, callerName, fsCallId, session != null && session.isOpen(),
+                session != null ? session.getId() : null, SESSION_POOL.keySet());
+        JSONObject msg = new JSONObject();
+        msg.put("type", "incoming_call_pending");
+        msg.put("call_id", callId);
+        msg.put("phone", phone);
+        msg.put("caller_name", callerName);
+        msg.put("fs_call_id", fsCallId);
+        sendMessage(agentUserId, msg.toJSONString());
+    }
+
     public static void pushIncomingCall(String agentUserId, String callId, String phone, String callerName, String fsCallId) {
         Session session = SESSION_POOL.get(agentUserId);
         log.info("[CallWS] 推送来电开始: agentUserId={}, callId={}, phone={}, callerName={}, fsCallId={}, online={}, sessionId={}, onlineUsers={}",

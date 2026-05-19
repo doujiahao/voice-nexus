@@ -23,10 +23,23 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallSession> implements ICallSessionService {
+
+    private static final long RINGING_CONFIRM_TIMEOUT_SEC = 20;
+    private static final ScheduledExecutorService timeoutScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "ringing-confirm-timeout");
+        t.setDaemon(true);
+        return t;
+    });
+    private static final ConcurrentHashMap<String, ScheduledFuture<?>> pendingRingingTimeouts = new ConcurrentHashMap<>();
 
     @Autowired
     private CallEventLogMapper callEventLogMapper;
@@ -78,15 +91,27 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
                 if (agent != null) {
                     agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
-                    // 推送来电弹窗
-                    CallWebSocket.pushIncomingCall(
+                    // 推送来电预告（不弹窗），等待 RINGING_CONFIRMED 后再弹窗
+                    CallWebSocket.pushIncomingCallPending(
                             agent.getUserId(),
                             session.getId(),
                             session.getCustomerPhone(),
                             null,
                             fsCallId);
-                    log.info("[CallEvent] RINGING 已推送来电弹窗: fsCallId={}, sessionId={}, agentUserId={}",
+                    log.info("[CallEvent] RINGING 已推送来电预告: fsCallId={}, sessionId={}, agentUserId={}",
                             fsCallId, session.getId(), agent.getUserId());
+
+                    // 20s 超时兜底：未收到 RINGING_CONFIRMED 则自动推送弹窗
+                    String agentUserId = agent.getUserId();
+                    String sessionId = session.getId();
+                    String customerPhone = session.getCustomerPhone();
+                    ScheduledFuture<?> timeout = timeoutScheduler.schedule(() -> {
+                        if (pendingRingingTimeouts.remove(fsCallId) != null) {
+                            log.warn("[CallEvent] RINGING_CONFIRMED 超时，自动推送来电弹窗: fsCallId={}, sessionId={}", fsCallId, sessionId);
+                            CallWebSocket.pushIncomingCall(agentUserId, sessionId, customerPhone, null, fsCallId);
+                        }
+                    }, RINGING_CONFIRM_TIMEOUT_SEC, TimeUnit.SECONDS);
+                    pendingRingingTimeouts.put(fsCallId, timeout);
                 }
             }
 
@@ -129,11 +154,41 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         log.info("[CallEvent] 已写入通话事件日志: fsCallId={}, sessionId={}, eventType={}, detail={}",
                 fsCallId, session.getId(), event.getEventType(), eventLog.getDetail());
 
+        // RINGING_CONFIRMED 事件：坐席端已振铃，推送来电弹窗
+        if ("RINGING_CONFIRMED".equals(event.getEventType())) {
+            // 取消超时兜底
+            ScheduledFuture<?> timeout = pendingRingingTimeouts.remove(fsCallId);
+            if (timeout != null) {
+                timeout.cancel(false);
+            }
+            if (session.getAgentId() != null) {
+                AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+                if (agent != null) {
+                    CallWebSocket.pushIncomingCall(
+                            agent.getUserId(),
+                            session.getId(),
+                            session.getCustomerPhone(),
+                            null,
+                            fsCallId);
+                    log.info("[CallEvent] RINGING_CONFIRMED 已推送来电弹窗: fsCallId={}, sessionId={}, agentUserId={}",
+                            fsCallId, session.getId(), agent.getUserId());
+                }
+            }
+            result.put("acknowledged", true);
+            result.put("call_session_id", session.getId());
+            return result;
+        }
+
         // 处理不同事件类型
         switch (event.getEventType()) {
             case "CALL_ENDED":
                 log.info("[CallEvent] 处理 CALL_ENDED: fsCallId={}, sessionId={}, agentId={}, endedBy={}, durationSec={}, metadata={}",
                         fsCallId, session.getId(), session.getAgentId(), event.getEndedBy(), event.getDurationSec(), event.getMetadata());
+                // 清理 RINGING 超时兜底
+                ScheduledFuture<?> endedTimeout = pendingRingingTimeouts.remove(fsCallId);
+                if (endedTimeout != null) {
+                    endedTimeout.cancel(false);
+                }
                 endSession(session, event.getEndedBy(),
                         event.getMetadata() != null ? event.getMetadata().get("hangup_cause") : "NORMAL",
                         event.getDurationSec());
