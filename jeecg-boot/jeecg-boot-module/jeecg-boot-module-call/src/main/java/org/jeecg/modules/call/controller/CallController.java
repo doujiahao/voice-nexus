@@ -42,6 +42,7 @@ public class CallController {
     @GetMapping("/agent/info")
     public Result<JSONObject> getAgentInfo() {
         LoginUser user = (LoginUser) SecurityUtils.getSubject().getPrincipal();
+        log.info("[CallAPI] 获取坐席信息: userId={}, username={}", user.getId(), user.getUsername());
         AgentProfile profile = agentProfileService.getByUserId(user.getId());
 
         JSONObject data = new JSONObject();
@@ -50,6 +51,8 @@ public class CallController {
         data.put("role", "agent");
         data.put("avatar_char", user.getRealname() != null && !user.getRealname().isEmpty()
                 ? user.getRealname().substring(0, 1) : "A");
+        log.info("[CallAPI] 坐席信息返回: userId={}, agentNo={}, agentId={}", user.getId(),
+                profile != null ? profile.getAgentNo() : null, profile != null ? profile.getId() : null);
         return Result.OK(data);
     }
 
@@ -61,6 +64,7 @@ public class CallController {
             @RequestParam(required = false) String status,
             @RequestParam(name = "start_time", required = false) String startTime,
             @RequestParam(name = "end_time", required = false) String endTime) {
+        log.info("[CallAPI] 查询通话列表: page={}, pageSize={}, status={}, startTime={}, endTime={}", page, pageSize, status, startTime, endTime);
 
         LambdaQueryWrapper<CallSession> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !"ALL".equals(status)) {
@@ -107,14 +111,17 @@ public class CallController {
         JSONObject result = new JSONObject();
         result.put("items", items);
         result.put("total", pageResult.getTotal());
+        log.info("[CallAPI] 通话列表返回: total={}, currentPage={}, itemCount={}", pageResult.getTotal(), page, items.size());
         return Result.OK(result);
     }
 
     @Operation(summary = "通话详情")
     @GetMapping("/calls/{callSessionId}")
     public Result<JSONObject> getCallDetail(@PathVariable String callSessionId) {
+        log.info("[CallAPI] 查询通话详情: callSessionId={}", callSessionId);
         CallSession session = callSessionService.getById(callSessionId);
         if (session == null) {
+            log.warn("[CallAPI] 通话记录不存在: callSessionId={}", callSessionId);
             return Result.error("通话记录不存在");
         }
 
@@ -156,6 +163,7 @@ public class CallController {
     @Operation(summary = "通话转写记录")
     @GetMapping("/calls/{callSessionId}/turns")
     public Result<JSONObject> getCallTurns(@PathVariable String callSessionId) {
+        log.info("[CallAPI] 查询通话转写: callSessionId={}", callSessionId);
         List<CallTurn> turns = callTurnMapper.selectList(
                 new LambdaQueryWrapper<CallTurn>()
                         .eq(CallTurn::getSessionId, callSessionId)
@@ -180,6 +188,7 @@ public class CallController {
 
         JSONObject result = new JSONObject();
         result.put("items", items);
+        log.info("[CallAPI] 通话转写返回: callSessionId={}, turnCount={}", callSessionId, items.size());
         return Result.OK(result);
     }
 
@@ -190,6 +199,7 @@ public class CallController {
         String fsCallId = body.getString("fs_call_id");
         String phone = body.getString("phone");
         String customerName = body.getString("customer_name");
+        log.info("[CallAPI] 开启通话会话: agentId={}, fsCallId={}, phone={}, customerName={}", agentId, fsCallId, phone, customerName);
 
         CallSession session = new CallSession();
         session.setFsCallId(fsCallId);
@@ -207,6 +217,7 @@ public class CallController {
         }
 
         callSessionService.save(session);
+        log.info("[CallAPI] 通话会话已创建: sessionId={}, fsCallId={}, agentId={}", session.getId(), fsCallId, session.getAgentId());
 
         JSONObject data = new JSONObject();
         data.put("call_session_id", session.getId());
@@ -217,6 +228,7 @@ public class CallController {
     @GetMapping("/calls/{callSessionId}/audio-url")
     public Result<JSONObject> getAudioUrl(@PathVariable String callSessionId,
                                           @RequestParam(name = "turn_id", required = false) String turnId) {
+        log.info("[CallAPI] 获取录音URL: callSessionId={}, turnId={}", callSessionId, turnId);
         JSONObject data = new JSONObject();
 
         if (turnId != null) {
@@ -251,6 +263,7 @@ public class CallController {
     @Operation(summary = "通话标签列表")
     @GetMapping("/calls/{callSessionId}/tags")
     public Result<JSONObject> getCallTags(@PathVariable String callSessionId) {
+        log.info("[CallAPI] 查询通话标签: callSessionId={}", callSessionId);
         List<CallTag> tags = callTagMapper.selectList(
                 new LambdaQueryWrapper<CallTag>().eq(CallTag::getSessionId, callSessionId));
 
@@ -271,18 +284,21 @@ public class CallController {
     @Operation(summary = "手动添加通话标签")
     @PostMapping("/calls/{callSessionId}/tags")
     public Result<CallTag> addTag(@PathVariable String callSessionId, @RequestBody JSONObject body) {
+        log.info("[CallAPI] 添加通话标签: callSessionId={}, tagName={}", callSessionId, body.getString("tag_name"));
         CallTag tag = new CallTag();
         tag.setSessionId(callSessionId);
         tag.setTagName(body.getString("tag_name"));
         tag.setSource("MANUAL");
         tag.setCreateTime(new Date());
         callTagMapper.insert(tag);
+        log.info("[CallAPI] 标签已添加: callSessionId={}, tagId={}, tagName={}", callSessionId, tag.getId(), tag.getTagName());
         return Result.OK(tag);
     }
 
     @Operation(summary = "删除通话标签")
     @DeleteMapping("/calls/{callSessionId}/tags/{tagId}")
     public Result<?> deleteTag(@PathVariable String callSessionId, @PathVariable String tagId) {
+        log.info("[CallAPI] 删除通话标签: callSessionId={}, tagId={}", callSessionId, tagId);
         callTagMapper.deleteById(tagId);
         return Result.OK("删除成功");
     }
@@ -290,12 +306,16 @@ public class CallController {
     @Operation(summary = "更新通话备注")
     @PutMapping("/calls/{callSessionId}/remark")
     public Result<?> updateRemark(@PathVariable String callSessionId, @RequestBody JSONObject body) {
+        String remark = body.getString("remark");
+        log.info("[CallAPI] 更新通话备注: callSessionId={}, remarkLength={}", callSessionId, remark != null ? remark.length() : 0);
         CallSession session = callSessionService.getById(callSessionId);
         if (session == null) {
+            log.warn("[CallAPI] 更新备注失败，通话记录不存在: callSessionId={}", callSessionId);
             return Result.error("通话记录不存在");
         }
-        session.setRemark(body.getString("remark"));
+        session.setRemark(remark);
         callSessionService.updateById(session);
+        log.info("[CallAPI] 备注已更新: callSessionId={}", callSessionId);
         return Result.OK("备注更新成功");
     }
 }

@@ -84,10 +84,19 @@ public class FreeSwitchClient {
 
     private static void postAction(JSONObject body) {
         String url = callProperties.getFreeswitch().getBaseUrl() + "/api/v1/calls/action";
+        log.info("[FSClient] 发送指令: url={}, action={}", url, body.getString("action"));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Internal-Key", callProperties.getInternal().getSecretKey());
         HttpEntity<JSONObject> entity = new HttpEntity<>(body, headers);
-        restTemplate.postForEntity(url, entity, String.class);
+        try {
+            org.springframework.http.ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+            log.info("[FSClient] 指令响应: url={}, action={}, statusCode={}, body={}",
+                    url, body.getString("action"), response.getStatusCode(),
+                    response.getBody() != null && response.getBody().length() > 200 ? response.getBody().substring(0, 200) + "..." : response.getBody());
+        } catch (Exception e) {
+            log.error("[FSClient] 指令调用失败: url={}, action={}", url, body.getString("action"), e);
+            throw e;
+        }
     }
 }

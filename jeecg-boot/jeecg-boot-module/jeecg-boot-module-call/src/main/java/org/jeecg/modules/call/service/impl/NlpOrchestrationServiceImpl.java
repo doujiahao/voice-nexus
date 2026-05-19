@@ -34,8 +34,11 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
     @Async
     @Override
     public void analyzeAgentAssist(CallSession session, String triggerTurnId) {
+        log.info("[NLP] 开始坐席辅助分析: sessionId={}, triggerTurnId={}, agentId={}",
+                session.getId(), triggerTurnId, session.getAgentId());
         List<JSONObject> turns = callContextService.getTurns(session.getId());
         if (turns.isEmpty()) {
+            log.warn("[NLP] 坐席辅助分析跳过，上下文为空: sessionId={}", session.getId());
             return;
         }
 
@@ -51,19 +54,29 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         meta.put("agent_id", session.getAgentId());
         body.put("meta", meta);
 
+        log.info("[NLP] 调用坐席辅助 Gateway: sessionId={}, url={}, turnCount={}", session.getId(), url, turns.size());
         JSONObject result = callGateway(url, body);
         if (result == null) {
+            log.warn("[NLP] 坐席辅助 Gateway 返回 null: sessionId={}", session.getId());
             return;
         }
 
         JSONObject data = result.getJSONObject("data");
+        log.info("[NLP] 坐席辅助分析成功: sessionId={}, intent={}, emotion={}, suggestions={}",
+                session.getId(),
+                data != null ? data.getString("current_intent") : null,
+                data != null ? data.getString("emotion") : null,
+                data != null && data.getJSONArray("decision_suggestions") != null ? data.getJSONArray("decision_suggestions").size() : 0);
         pushAgentAssistToFrontend(session, data);
     }
 
     @Override
     public JSONObject generateSessionSummary(CallSession session) {
+        log.info("[NLP] 开始生成会话摘要: sessionId={}, agentId={}, customerPhone={}",
+                session.getId(), session.getAgentId(), session.getCustomerPhone());
         List<JSONObject> turns = callContextService.getTurns(session.getId());
         if (turns.isEmpty()) {
+            log.warn("[NLP] 摘要生成跳过，上下文为空: sessionId={}", session.getId());
             return null;
         }
 
@@ -81,16 +94,24 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         }
         body.put("meta", meta);
 
+        log.info("[NLP] 调用摘要 Gateway: sessionId={}, url={}, turnCount={}", session.getId(), url, turns.size());
         JSONObject result = callGateway(url, body);
         if (result == null) {
+            log.warn("[NLP] 摘要 Gateway 返回 null: sessionId={}", session.getId());
             return null;
         }
 
-        return result.getJSONObject("data");
+        JSONObject data = result.getJSONObject("data");
+        log.info("[NLP] 摘要生成成功: sessionId={}, customerIntent={}, emotion={}",
+                session.getId(),
+                data != null ? data.getString("customer_intent") : null,
+                data != null ? data.getString("emotion") : null);
+        return data;
     }
 
     private void pushAgentAssistToFrontend(CallSession session, JSONObject data) {
         if (session.getAgentId() == null) {
+            log.warn("[NLP] 跳过坐席辅助推送，无坐席: sessionId={}", session.getId());
             return;
         }
         AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
@@ -98,6 +119,8 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
             log.warn("[NLP] 跳过坐席辅助推送，坐席用户不存在: sessionId={}, agentId={}", session.getId(), session.getAgentId());
             return;
         }
+        log.info("[NLP] 推送坐席辅助到前端: sessionId={}, agentUserId={}, intent={}",
+                session.getId(), agent.getUserId(), data != null ? data.getString("current_intent") : null);
         JSONObject msg = new JSONObject();
         msg.put("type", "agent_assist");
         msg.put("call_session_id", session.getId());
@@ -122,11 +145,13 @@ public class NlpOrchestrationServiceImpl implements INlpOrchestrationService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> entity = new HttpEntity<>(body.toJSONString(), headers);
+        log.info("[NLP] Gateway 请求: url={}, bodySize={}", url, body.toJSONString().length());
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             JSONObject result = JSON.parseObject(response.getBody());
             if (result != null && result.getIntValue("code") == 0) {
+                log.info("[NLP] Gateway 成功: url={}, code={}", url, result.getIntValue("code"));
                 return result;
             }
             log.warn("[NLP] Gateway 返回异常: url={}, resp={}", url, result);

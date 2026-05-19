@@ -28,7 +28,7 @@ public class AudioPipelineServiceImpl implements IAudioPipelineService {
         try {
             frame = AsrProto.AudioFrame.parseFrom(frameData);
         } catch (InvalidProtocolBufferException e) {
-            log.error("[AudioPipeline] Protobuf 反序列化失败: sessionId={}", sessionId, e);
+            log.error("[AudioPipeline] Protobuf 反序列化失败: sessionId={}, dataLength={}", sessionId, frameData.length, e);
             return;
         }
 
@@ -37,6 +37,8 @@ public class AudioPipelineServiceImpl implements IAudioPipelineService {
         String speakerName = frame.getSpeakerName();
         boolean isLast = frame.getIsLast();
         byte[] audioData = frame.getData().toByteArray();
+        log.debug("[AudioPipeline] 收到音频帧: sessionId={}, speakerId={}, speakerRole={}, sequence={}, isLast={}, bytes={}",
+                sessionId, speakerId, speakerRole, frame.getSequenceNumber(), isLast, audioData.length);
 
         if (isLast) {
             log.info("[AudioPipeline] 收到最终音频帧: sessionId={}, speakerId={}, speakerName={}, speakerRole={}, sequence={}, bytes={}",
@@ -52,12 +54,15 @@ public class AudioPipelineServiceImpl implements IAudioPipelineService {
         String objectPath = buildObjectPath(sessionId, speakerId);
         try {
             MinioUtil.upload(new ByteArrayInputStream(audioData), objectPath);
+            log.info("[AudioPipeline] MinIO 上传成功: sessionId={}, path={}, bytes={}, isLast={}", sessionId, objectPath, audioData.length, isLast);
         } catch (Exception e) {
-            log.error("[AudioPipeline] MinIO 上传失败: sessionId={}, path={}", sessionId, objectPath, e);
+            log.error("[AudioPipeline] MinIO 上传失败: sessionId={}, path={}, bytes={}", sessionId, objectPath, audioData.length, e);
             return;
         }
 
         if (isLast) {
+            log.info("[AudioPipeline] 触发 ASR 转写: sessionId={}, path={}, speakerId={}, speakerName={}, speakerRole={}",
+                    sessionId, objectPath, speakerId, speakerName, speakerRole);
             triggerAsr(sessionId, objectPath, speakerId, speakerName, speakerRole);
         }
     }

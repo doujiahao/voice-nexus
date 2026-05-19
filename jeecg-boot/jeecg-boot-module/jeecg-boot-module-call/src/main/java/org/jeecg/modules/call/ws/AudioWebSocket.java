@@ -62,15 +62,17 @@ public class AudioWebSocket {
     public void onMessage(ByteBuffer buffer, @PathParam("sessionId") String sessionId) {
         byte[] data = new byte[buffer.remaining()];
         buffer.get(data);
+        log.debug("[AudioWS] 收到音频帧: sessionId={}, bytes={}", sessionId, data.length);
         try {
             audioPipelineService.processAudioFrame(sessionId, data);
         } catch (Exception e) {
-            log.error("[AudioWS] 音频帧处理失败: sessionId={}", sessionId, e);
+            log.error("[AudioWS] 音频帧处理失败: sessionId={}, bytes={}", sessionId, data.length, e);
         }
     }
 
     @OnMessage
     public void onTextMessage(String message, @PathParam("sessionId") String sessionId) {
+        log.debug("[AudioWS] 收到文本消息: sessionId={}, msg={}", sessionId, message);
         // 文本消息仅用于心跳
         if (message.contains("ping")) {
             Session session = SESSION_POOL.get(sessionId);

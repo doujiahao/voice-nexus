@@ -31,6 +31,7 @@ public class AsrProxyController {
     @PostMapping("/transcribe")
     public ResponseEntity<String> transcribe(HttpServletRequest request) {
         String gatewayUrl = callProperties.getGateway().getBaseUrl() + "/api/v1/asr/transcribe";
+        log.info("[AsrProxy] 收到 ASR 转写代理请求: gatewayUrl={}", gatewayUrl);
 
         MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -39,6 +40,9 @@ public class AsrProxyController {
         MultipartFile file = multipartRequest.getFile("file");
         if (file != null) {
             body.add("file", file.getResource());
+            log.info("[AsrProxy] 转发文件: fileName={}, size={}", file.getOriginalFilename(), file.getSize());
+        } else {
+            log.warn("[AsrProxy] ASR 转写请求无文件");
         }
 
         // 转发其他表单字段
@@ -48,6 +52,7 @@ public class AsrProxyController {
                 body.add(entry.getKey(), entry.getValue()[0]);
             }
         }
+        log.info("[AsrProxy] 转发参数: params={}", params.keySet());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
@@ -57,11 +62,12 @@ public class AsrProxyController {
         try {
             ResponseEntity<String> response = restTemplate.exchange(
                     gatewayUrl, HttpMethod.POST, entity, String.class);
+            log.info("[AsrProxy] Gateway 响应: statusCode={}", response.getStatusCode());
             return ResponseEntity.status(response.getStatusCode())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(response.getBody());
         } catch (Exception e) {
-            log.error("ASR 代理转发失败", e);
+            log.error("[AsrProxy] ASR 代理转发失败: gatewayUrl={}", gatewayUrl, e);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body("{\"code\":-1,\"message\":\"Gateway unreachable: " + e.getMessage() + "\"}");
         }
@@ -71,6 +77,7 @@ public class AsrProxyController {
     @PostMapping("/agent-assist/analyze")
     public ResponseEntity<String> agentAssist(@RequestBody String body) {
         String gatewayUrl = callProperties.getGateway().getBaseUrl() + "/api/v1/nlp/agent-assist/analyze";
+        log.info("[AsrProxy] 收到坐席辅助代理请求: gatewayUrl={}, bodyLength={}", gatewayUrl, body.length());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -80,11 +87,12 @@ public class AsrProxyController {
         try {
             ResponseEntity<String> response = restTemplate.exchange(
                     gatewayUrl, HttpMethod.POST, entity, String.class);
+            log.info("[AsrProxy] 坐席辅助 Gateway 响应: statusCode={}", response.getStatusCode());
             return ResponseEntity.status(response.getStatusCode())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(response.getBody());
         } catch (Exception e) {
-            log.error("AgentAssist 代理转发失败", e);
+            log.error("[AsrProxy] AgentAssist 代理转发失败: gatewayUrl={}", gatewayUrl, e);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body("{\"code\":-1,\"message\":\"Gateway unreachable: " + e.getMessage() + "\"}");
         }

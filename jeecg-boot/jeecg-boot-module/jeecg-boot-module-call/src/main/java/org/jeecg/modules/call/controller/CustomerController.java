@@ -34,6 +34,7 @@ public class CustomerController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(name = "page_size", defaultValue = "20") int pageSize,
             @RequestParam(required = false) String keyword) {
+        log.info("[CustomerAPI] 查询客户列表: page={}, pageSize={}, keyword={}", page, pageSize, keyword);
 
         LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isEmpty()) {
@@ -44,14 +45,17 @@ public class CustomerController {
         wrapper.orderByDesc(Customer::getCreateTime);
 
         Page<Customer> result = customerMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        log.info("[CustomerAPI] 客户列表返回: total={}, currentPage={}", result.getTotal(), page);
         return Result.OK(result);
     }
 
     @Operation(summary = "客户详情")
     @GetMapping("/{id}")
     public Result<JSONObject> detail(@PathVariable String id) {
+        log.info("[CustomerAPI] 查询客户详情: id={}", id);
         Customer customer = customerMapper.selectById(id);
         if (customer == null) {
+            log.warn("[CustomerAPI] 客户不存在: id={}", id);
             return Result.error("客户不存在");
         }
 
@@ -66,14 +70,17 @@ public class CustomerController {
     @Operation(summary = "新增客户")
     @PostMapping
     public Result<Customer> create(@RequestBody Customer customer) {
+        log.info("[CustomerAPI] 新增客户: name={}, customerNo={}", customer.getName(), customer.getCustomerNo());
         customer.setCreateTime(new Date());
         customerMapper.insert(customer);
+        log.info("[CustomerAPI] 客户已创建: id={}, name={}", customer.getId(), customer.getName());
         return Result.OK(customer);
     }
 
     @Operation(summary = "更新客户")
     @PutMapping("/{id}")
     public Result<Customer> update(@PathVariable String id, @RequestBody Customer customer) {
+        log.info("[CustomerAPI] 更新客户: id={}, name={}", id, customer.getName());
         customer.setId(id);
         customer.setUpdateTime(new Date());
         customerMapper.updateById(customer);
@@ -83,6 +90,7 @@ public class CustomerController {
     @Operation(summary = "删除客户")
     @DeleteMapping("/{id}")
     public Result<?> delete(@PathVariable String id) {
+        log.info("[CustomerAPI] 删除客户: id={}", id);
         customerMapper.deleteById(id);
         return Result.OK("删除成功");
     }
@@ -126,15 +134,18 @@ public class CustomerController {
     @Operation(summary = "按手机号查客户")
     @GetMapping("/by-phone")
     public Result<Customer> findByPhone(@RequestParam String phone) {
+        log.info("[CustomerAPI] 按手机号查客户: phone={}", phone);
         CustomerContact contact = customerContactMapper.selectOne(
                 new LambdaQueryWrapper<CustomerContact>()
                         .eq(CustomerContact::getContactType, "PHONE")
                         .eq(CustomerContact::getContactValue, phone)
                         .last("LIMIT 1"));
         if (contact == null) {
+            log.info("[CustomerAPI] 手机号未匹配到联系方式: phone={}", phone);
             return Result.OK(null);
         }
         Customer customer = customerMapper.selectById(contact.getCustomerId());
+        log.info("[CustomerAPI] 手机号匹配客户: phone={}, customerId={}, customerName={}", phone, contact.getCustomerId(), customer != null ? customer.getName() : null);
         return Result.OK(customer);
     }
 }

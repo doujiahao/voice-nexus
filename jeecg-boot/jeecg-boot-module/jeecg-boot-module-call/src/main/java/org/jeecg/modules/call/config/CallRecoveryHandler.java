@@ -44,9 +44,12 @@ public class CallRecoveryHandler {
         List<CallSession> activeSessions = callSessionMapper.selectList(
                 new LambdaQueryWrapper<CallSession>()
                         .in(CallSession::getStatus, "TALKING", "RINGING", "QUEUING"));
+        log.info("[Recovery] 发现 {} 个残留活跃会话", activeSessions.size());
 
         int recovered = 0;
         for (CallSession session : activeSessions) {
+            log.info("[Recovery] 恢复会话: sessionId={}, fsCallId={}, status={}, agentId={}",
+                    session.getId(), session.getFsCallId(), session.getStatus(), session.getAgentId());
             session.setStatus("ENDED");
             session.setEndTime(new Date());
             session.setEndedBy("SYSTEM_RECOVERY");
@@ -63,8 +66,11 @@ public class CallRecoveryHandler {
         List<AgentProfile> talkingAgents = agentProfileMapper.selectList(
                 new LambdaQueryWrapper<AgentProfile>()
                         .in(AgentProfile::getStatus, "TALKING", "RINGING", "HOLDING"));
+        log.info("[Recovery] 发现 {} 个异常状态坐席", talkingAgents.size());
 
         for (AgentProfile agent : talkingAgents) {
+            log.info("[Recovery] 恢复坐席状态: agentId={}, userId={}, agentNo={}, oldStatus={}",
+                    agent.getId(), agent.getUserId(), agent.getAgentNo(), agent.getStatus());
             agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, "服务重启恢复");
         }
         if (!talkingAgents.isEmpty()) {

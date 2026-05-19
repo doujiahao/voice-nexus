@@ -49,10 +49,14 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
 
     @Override
     public void transcribe(String sessionId, String audioPath, String speakerId, String speakerName, String speakerRole) {
+        log.info("[ASR] 开始转写: sessionId={}, audioPath={}, speakerId={}, speakerName={}, speakerRole={}",
+                sessionId, audioPath, speakerId, speakerName, speakerRole);
         byte[] audioBytes = downloadFromMinio(audioPath);
         if (audioBytes == null) {
+            log.warn("[ASR] 音频下载失败，跳过转写: sessionId={}, audioPath={}", sessionId, audioPath);
             return;
         }
+        log.info("[ASR] 音频下载成功: sessionId={}, audioPath={}, bytes={}", sessionId, audioPath, audioBytes.length);
 
         String gatewayUrl = callProperties.getGateway().getBaseUrl() + "/api/v1/asr/transcribe";
 
@@ -117,6 +121,8 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
     }
 
     private void saveTurnAndPush(String sessionId, String audioPath, String speakerId, String speakerName, String speakerRole, JSONObject data) {
+        log.info("[ASR] 保存转写轮次: sessionId={}, speakerRole={}, correctedText={}",
+                sessionId, data.getString("speaker_role"), abbreviate(data.getString("corrected_text"), 80));
         Long turnCount = callTurnMapper.selectCount(
                 new LambdaQueryWrapper<CallTurn>().eq(CallTurn::getSessionId, sessionId));
 
@@ -140,6 +146,8 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
         }
         turn.setCreateTime(new Date());
         callTurnMapper.insert(turn);
+        log.info("[ASR] 轮次已入库: sessionId={}, turnId={}, turnIndex={}, speakerRole={}, intent={}",
+                sessionId, turn.getId(), turn.getTurnIndex(), turn.getSpeakerRole(), turn.getIntent());
 
         JSONObject turnCtx = new JSONObject();
         turnCtx.put("turn_id", turn.getId());
@@ -167,6 +175,7 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
 
     private void pushToFrontend(CallSession session, CallTurn turn, JSONObject data) {
         if (session == null || session.getAgentId() == null) {
+            log.warn("[ASR] 跳过前端推送，会话或坐席为空: sessionId={}", session != null ? session.getId() : null);
             return;
         }
         AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
@@ -174,6 +183,8 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
             log.warn("[ASR] 跳过前端推送，坐席用户不存在: sessionId={}, agentId={}", session.getId(), session.getAgentId());
             return;
         }
+        log.info("[ASR] 推送转写结果到前端: sessionId={}, agentUserId={}, turnId={}, speakerRole={}",
+                session.getId(), agent.getUserId(), turn.getId(), turn.getSpeakerRole());
         CallWebSocket.pushAsrResult(
                 agent.getUserId(),
                 turn.getCorrectedText() != null ? turn.getCorrectedText() : turn.getText(),
@@ -210,9 +221,13 @@ public class AsrOrchestrationServiceImpl implements IAsrOrchestrationService {
     private byte[] downloadFromMinio(String objectPath) {
         try {
             InputStream is = MinioUtil.getMinioFile(MinioUtil.getBucketName(), objectPath);
-            if (is == null) return null;
+            if (is == null) {
+                log.warn("[ASR] MinIO 文件不存在: path={}", objectPath);
+                return null;
+            }
             byte[] bytes = is.readAllBytes();
             is.close();
+            log.info("[ASR] MinIO 下载成功: path={}, bytes={}", objectPath, bytes.length);
             return bytes;
         } catch (Exception e) {
             log.error("[ASR] MinIO 下载失败: path={}", objectPath, e);

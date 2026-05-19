@@ -27,7 +27,9 @@ public class AgentStatusController {
     @GetMapping("/status")
     public Result<String> getStatus() {
         LoginUser user = (LoginUser) SecurityUtils.getSubject().getPrincipal();
+        log.info("[AgentAPI] 查询坐席状态: userId={}", user.getId());
         AgentStatusEnum status = agentProfileService.getCurrentStatus(user.getId());
+        log.info("[AgentAPI] 坐席状态返回: userId={}, status={}", user.getId(), status.getCode());
         return Result.OK(status.getCode());
     }
 
@@ -46,12 +48,15 @@ public class AgentStatusController {
             }
         }
         if (status == null) {
+            log.warn("[AgentAPI] 变更坐席状态失败，缺少 status 参数");
             return Result.error("缺少坐席状态 status");
         }
 
         LoginUser user = (LoginUser) SecurityUtils.getSubject().getPrincipal();
+        log.info("[AgentAPI] 变更坐席状态: userId={}, newStatus={}, reason={}", user.getId(), status, reason);
         AgentStatusEnum newStatus = AgentStatusEnum.fromCode(status);
         agentProfileService.changeStatus(user.getId(), newStatus, reason);
+        log.info("[AgentAPI] 坐席状态变更完成: userId={}, newStatus={}", user.getId(), newStatus.getCode());
         return Result.OK("状态已变更为: " + newStatus.getDesc());
     }
 
@@ -59,7 +64,12 @@ public class AgentStatusController {
     @GetMapping("/profile")
     public Result<AgentProfile> getProfile() {
         LoginUser user = (LoginUser) SecurityUtils.getSubject().getPrincipal();
+        log.info("[AgentAPI] 查询坐席档案: userId={}", user.getId());
         AgentProfile profile = agentProfileService.getByUserId(user.getId());
+        log.info("[AgentAPI] 坐席档案返回: userId={}, agentId={}, agentNo={}, extension={}",
+                user.getId(), profile != null ? profile.getId() : null,
+                profile != null ? profile.getAgentNo() : null,
+                profile != null ? profile.getExtension() : null);
         return Result.OK(profile);
     }
 }
