@@ -15,6 +15,7 @@ export interface CallListResult {
     customer_name: string
     agent_id: string
     agent_name: string
+    direction: string
     status: string
     turn_count: number
     summary_short: string

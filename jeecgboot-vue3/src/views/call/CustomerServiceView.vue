@@ -67,6 +67,7 @@
         :is-loading="callHistoryLoading"
         :is-loading-more="callHistoryLoadingMore"
         :has-more="callHistoryHasMore"
+        :error="callHistoryError"
         :call-active="isCallActive"
         :show-assist="isCallActive && aiEnabled"
         :assist-result="assistResult"
@@ -155,6 +156,13 @@ function onAiToggle(val: boolean): void {
 
 function _onCallState(payload: any): void {
   if (payload.state === 'active') {
+    // Linphone 先接听时，前端尚未启动 ASR 和计时器，需补启
+    // 前端先接听时，acceptCall() 已启动，跳过避免重置计时器
+    if (!isCallActive.value) {
+      startAsr()
+      startCallTimer()
+      showToast('Linphone 已接听')
+    }
     hadRealCall = true
     toActive()
     resetAnalysis()
@@ -238,6 +246,7 @@ const callHistory = useCallHistory()
 const {
   visibleRecords: callVisibleRecords, totalCount: callTotalCount, expanded: callExpanded,
   isLoading: callHistoryLoading, isLoadingMore: callHistoryLoadingMore, hasMore: callHistoryHasMore,
+  error: callHistoryError,
   fetchList: fetchCallList, fetchMore: fetchCallMore, fetchTurns: fetchCallTurns,
   fetchTurnsWithAudio: fetchCallTurnsWithAudio,
   fetchDetail: fetchCallDetail, selectOnly: selectCallOnly, refresh: refreshCallList, updateRecordNote: updateCallRecordNote,
@@ -451,7 +460,7 @@ function exitReviewing(): void {
 }
 
 watch(activeTab, (tab) => {
-  if (tab !== 'analysis' || isCallActive.value || !cachedDetail.value) return
+  if (tab !== 'analysis' || isCallActive.value || !cachedDetail.value?.summary) return
   loadFromSummary(cachedDetail.value.summary)
 })
 

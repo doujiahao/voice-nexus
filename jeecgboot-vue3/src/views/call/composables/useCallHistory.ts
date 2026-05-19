@@ -14,16 +14,21 @@ export function useCallHistory() {
   const hasMore       = computed(() => allRecords.value.length < totalCount.value)
   const expanded      = ref(false)
   const selectedId    = ref('')
+  const error         = ref<string | null>(null)
 
   const visibleRecords = computed<CallRecord[]>(() =>
     expanded.value ? allRecords.value : allRecords.value.slice(0, PREVIEW_CNT)
   )
+
+  function _clearError(): void { error.value = null }
 
   function _mapItem(item: CallListItem, existingNotes: Map<string, string>): CallRecord {
     return {
       call_session_id: item.call_session_id,
       phone:           item.phone,
       customer_name:   item.customer_name,
+      direction:       item.direction,
+      status:          item.status,
       date:            item.started_at?.slice(0, 10) ?? '',
       time:            item.started_at?.slice(11, 16) ?? '',
       note:            existingNotes.get(item.call_session_id) ?? item.summary_short ?? '',
@@ -33,8 +38,9 @@ export function useCallHistory() {
   }
 
   async function fetchList(): Promise<void> {
-    if (isLoading.value) return
+    if (isLoading.value || isLoadingMore.value) return
     isLoading.value = true
+    _clearError()
     try {
       const res = await getCallList(1, PAGE_SIZE) as any
       if (res.code === 200 && Array.isArray(res.result?.items)) {
@@ -42,9 +48,12 @@ export function useCallHistory() {
         allRecords.value  = (res.result.items as CallListItem[]).map(item => _mapItem(item, existingNotes))
         totalCount.value  = res.result.total ?? allRecords.value.length
         currentPage.value = 1
+      } else {
+        error.value = '获取通话列表失败'
       }
     } catch (err: any) {
       console.error('[useCallHistory] 拉取列表失败:', err.message)
+      error.value = err.message || '网络请求失败'
     } finally {
       isLoading.value = false
     }
@@ -53,6 +62,7 @@ export function useCallHistory() {
   async function fetchMore(): Promise<void> {
     if (isLoadingMore.value || isLoading.value || !hasMore.value) return
     isLoadingMore.value = true
+    _clearError()
     try {
       const nextPage = currentPage.value + 1
       const res = await getCallList(nextPage, PAGE_SIZE) as any
@@ -68,6 +78,7 @@ export function useCallHistory() {
       }
     } catch (err: any) {
       console.error('[useCallHistory] 追加列表失败:', err.message)
+      error.value = err.message || '加载更多失败'
     } finally {
       isLoadingMore.value = false
     }
@@ -129,11 +140,14 @@ export function useCallHistory() {
   }
 
   async function updateRecordNote(id: string, note: string): Promise<void> {
+    const oldNote = allRecords.value.find((r: CallRecord) => r.call_session_id === id)?.note ?? ''
     allRecords.value = allRecords.value.map((r: CallRecord) => r.call_session_id === id ? { ...r, note } : r)
     try {
       await updateCallRemark(id, note)
     } catch (err: any) {
-      console.warn('[useCallHistory] 备注持久化失败（后端接口可能尚未就绪）:', err.message)
+      allRecords.value = allRecords.value.map((r: CallRecord) => r.call_session_id === id ? { ...r, note: oldNote } : r)
+      error.value = '备注保存失败'
+      console.warn('[useCallHistory] 备注持久化失败:', err.message)
     }
   }
 
@@ -148,6 +162,7 @@ export function useCallHistory() {
     hasMore,
     expanded,
     selectedId:       readonly(selectedId),
+    error:            readonly(error),
     fetchList,
     fetchMore,
     fetchTurns,
