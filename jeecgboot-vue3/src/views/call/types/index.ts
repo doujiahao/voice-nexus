@@ -51,6 +51,7 @@ export interface CallRecord {
   phone: string
   customer_name: string
   date: string
+  time: string
   note: string
   duration_sec: number
   active: boolean

@@ -6,36 +6,11 @@ const _incomingCall  = ref<IncomingCallData | null>(null)
 const _queue: IncomingCallData[] = []
 const _acceptedCall  = ref<IncomingCallData | null>(null)
 const _answeredCall  = ref<IncomingCallData | null>(null)
-const _autoRejected  = ref(false)
 const _rejectedFromRinging = ref(false)
-const RING_TIMEOUT_MS = 30_000
 let _initialized = false
-let _ringTimer: ReturnType<typeof setTimeout> | null = null
-let _javaWsRef: ReturnType<typeof useJavaWs> | null = null
-
-function _clearRingTimer(): void {
-  if (_ringTimer) { clearTimeout(_ringTimer); _ringTimer = null }
-}
-
-function _getWs() {
-  return _javaWsRef ?? useJavaWs()
-}
-
-function _startRingTimer(): void {
-  _clearRingTimer()
-  _ringTimer = setTimeout(() => {
-    if (!_incomingCall.value) return
-    _getWs().send({ type: 'call_response', call_id: _incomingCall.value.callId, action: 'reject' })
-    _autoRejected.value = true
-    _rejectedFromRinging.value = true
-    _next()
-  }, RING_TIMEOUT_MS)
-}
 
 function _next(): void {
-  _clearRingTimer()
   _incomingCall.value = _queue.shift() ?? null
-  if (_incomingCall.value) _startRingTimer()
 }
 
 function _handleIncomingCall(msg: Record<string, unknown>): void {
@@ -50,7 +25,6 @@ function _handleIncomingCall(msg: Record<string, unknown>): void {
   console.log('[CallNotify] 解析后来电数据:', call)
   if (_incomingCall.value === null) {
     _incomingCall.value = call
-    _startRingTimer()
   } else {
     _queue.push(call)
   }
@@ -67,7 +41,6 @@ function _handleIncomingCallCancelled(msg: Record<string, unknown>): void {
   const matches = _matchesCall(msg)
 
   if (_incomingCall.value && matches(_incomingCall.value)) {
-    _clearRingTimer()
     _rejectedFromRinging.value = true
     _incomingCall.value = null
     _next()
@@ -83,7 +56,6 @@ function _handleIncomingCallAnswered(msg: Record<string, unknown>): void {
   const matches = _matchesCall(msg)
 
   if (_incomingCall.value && matches(_incomingCall.value)) {
-    _clearRingTimer()
     _answeredCall.value = _incomingCall.value
     _incomingCall.value = null
     _next()
@@ -99,7 +71,6 @@ function _handleIncomingCallAnswered(msg: Record<string, unknown>): void {
 
 export function useCallNotify() {
   const javaWs = useJavaWs()
-  _javaWsRef = javaWs
 
   function init(): void {
     if (_initialized) return
@@ -111,8 +82,6 @@ export function useCallNotify() {
 
   function accept(): void {
     if (!_incomingCall.value) return
-    _clearRingTimer()
-    _autoRejected.value = false
     console.log('[CallNotify] 接听来电, callId:', _incomingCall.value.callId)
     javaWs.send({ type: 'call_response', call_id: _incomingCall.value.callId, action: 'accept' })
     _acceptedCall.value = _incomingCall.value
@@ -121,11 +90,8 @@ export function useCallNotify() {
 
   function reject(): void {
     if (!_incomingCall.value) return
-    _clearRingTimer()
-    _autoRejected.value = false
     console.log('[CallNotify] 拒接来电, callId:', _incomingCall.value.callId)
     javaWs.send({ type: 'call_response', call_id: _incomingCall.value.callId, action: 'reject' })
-    // 拒接后坐席应从振铃恢复空闲（后端不会推送 call_state:idle）
     _rejectedFromRinging.value = true
     _next()
   }
@@ -138,10 +104,6 @@ export function useCallNotify() {
     _answeredCall.value = null
   }
 
-  function clearAutoRejected(): void {
-    _autoRejected.value = false
-  }
-
   function clearRejectedFromRinging(): void {
     _rejectedFromRinging.value = false
   }
@@ -150,14 +112,12 @@ export function useCallNotify() {
     incomingCall: readonly(_incomingCall),
     acceptedCall: readonly(_acceptedCall),
     answeredCall: readonly(_answeredCall),
-    autoRejected: readonly(_autoRejected),
     rejectedFromRinging: readonly(_rejectedFromRinging),
     init,
     accept,
     reject,
     clearAccepted,
     clearAnswered,
-    clearAutoRejected,
     clearRejectedFromRinging,
   }
 }

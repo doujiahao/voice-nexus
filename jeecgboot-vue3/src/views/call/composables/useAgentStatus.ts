@@ -36,7 +36,7 @@ const FROM_BACKEND: Record<string, AgentStatus> = {
   RINGING:  'ringing',
   TALKING:  'on_call',
   HOLDING:  'on_call',
-  WRAP_UP:  'wrap_up',
+  WRAP_UP:  'idle',
 }
 
 function _handleServerStatus(payload: { status?: unknown }): void {
@@ -95,21 +95,6 @@ export function useAgentStatus() {
     }
   }
 
-  function setWrapUp(): void {
-    if (_status.value === 'on_call') {
-      _status.value = 'wrap_up'
-    }
-  }
-
-  function finishWrapUp(): void {
-    if (_status.value === 'wrap_up') {
-      _status.value = 'idle'
-      javaWs.send({ type: 'agent_status_update', status: 'idle' })
-      updateAgentStatus(TO_BACKEND.idle, '话后整理完成')
-        .catch((err: any) => console.warn('[AgentStatus] 话后整理完成状态同步失败:', err.message))
-    }
-  }
-
   async function setStatus(status: AgentStatus): Promise<void> {
     if (status === 'on_call' || status === 'ringing') return
     const prev = _status.value
@@ -155,8 +140,6 @@ export function useAgentStatus() {
     setStatus,
     setRinging,
     resetFromRinging,
-    setWrapUp,
-    finishWrapUp,
     syncWithCallPhase,
   }
 }

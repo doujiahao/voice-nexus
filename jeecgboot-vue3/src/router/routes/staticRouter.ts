@@ -36,6 +36,8 @@ export const CALL_ROUTE: AppRouteRecordRaw = {
       meta: {
         title: '坐席工作台',
         hideMenu: true,
+        keepAlive: true,
+        ignoreKeepAlive: false,
       },
     },
   ],

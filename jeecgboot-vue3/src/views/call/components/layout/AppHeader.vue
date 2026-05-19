@@ -33,19 +33,12 @@
 
       <div v-if="showReloadHint" class="cs-reload-hint" @click="reload">⚠ 连接失败，点击刷新</div>
 
-      <div class="cs-agent-wrap">
-        <div class="cs-agent-name">
-          <div class="cs-agent-text">
-            <span class="cs-agent-title-name">{{ agentInfo.name }}</span>
-            <span class="cs-agent-role">{{ agentInfo.role }}</span>
-          </div>
-          <div class="cs-agent-avatar">{{ agentInfo.avatarChar }}</div>
+      <div class="cs-agent-info">
+        <div class="cs-agent-text">
+          <span class="cs-agent-title-name">{{ agentInfo.name }}</span>
+          <span class="cs-agent-role">{{ agentInfo.role }}</span>
         </div>
-        <div class="cs-agent-dropdown">
-          <div class="cs-agent-dropdown-item" @click="onLogout">
-            <span>⏻</span><span>退出登录</span>
-          </div>
-        </div>
+        <div class="cs-agent-avatar">{{ agentInfo.avatarChar }}</div>
       </div>
     </div>
   </div>
@@ -53,7 +46,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useUserStore } from '/@/store/modules/user'
 import { AGENT_STATUS_MANUAL } from '../../composables/useAgentStatus'
 import type { AgentInfo, AgentStatus, WsStateEnum } from '../../types'
 
@@ -104,11 +96,6 @@ function toggleDropdown(): void { dropdownOpen.value = !dropdownOpen.value }
 function onSelectStatus(status: AgentStatus): void { dropdownOpen.value = false; emit('status-change', status) }
 function reload(): void { window.location.reload() }
 
-async function onLogout(): Promise<void> {
-  const userStore = useUserStore()
-  await userStore.logout()
-}
-
 function onDocClick(): void { dropdownOpen.value = false }
 onMounted(() => document.addEventListener('click', onDocClick))
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
@@ -139,14 +126,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 .cs-opt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .cs-reload-hint { font-size: 12px; color: #ef4444; cursor: pointer; padding: 4px 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; }
 .cs-reload-hint:hover { background: #fee2e2; }
-.cs-agent-wrap { position: relative; display: flex; align-items: center; }
-.cs-agent-name { display: flex; align-items: center; gap: 8px; cursor: default; }
+.cs-agent-info { display: flex; align-items: center; gap: 8px; }
 .cs-agent-text { text-align: right; }
 .cs-agent-title-name { display: block; font-size: 13px; font-weight: 600; color: #1a2a4a; }
 .cs-agent-role { display: block; font-size: 11px; color: #999; }
 .cs-agent-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #f97316, #ef4444); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
-.cs-agent-dropdown { position: absolute; top: calc(100% + 8px); right: -16px; min-width: 140px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.10); overflow: hidden; opacity: 0; pointer-events: none; transform: translateY(-4px); transition: opacity 0.18s, transform 0.18s; z-index: 100; }
-.cs-agent-wrap:hover .cs-agent-dropdown { opacity: 1; pointer-events: auto; transform: translateY(0); }
-.cs-agent-dropdown-item { display: flex; align-items: center; gap: 8px; padding: 12px 20px; font-size: 13px; color: #374151; cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; }
-.cs-agent-dropdown-item:hover { background: #fef2f2; color: #ef4444; }
 </style>

@@ -46,10 +46,15 @@ function _collectStrings(input: unknown): string[] {
   return out
 }
 
+// 模块级单例，切换路由后状态不丢失
+const _analysisResult = ref<AnalysisResult | null>(null)
+const _isAnalyzing    = ref(false)
+const _analysisError  = ref<string | null>(null)
+
 export function useAnalysis() {
-  const analysisResult = ref<AnalysisResult | null>(null)
-  const isAnalyzing    = ref(false)
-  const analysisError  = ref<string | null>(null)
+  const analysisResult = _analysisResult
+  const isAnalyzing    = _isAnalyzing
+  const analysisError  = _analysisError
 
   function _ensureResult(): AnalysisResult {
     if (!analysisResult.value) {

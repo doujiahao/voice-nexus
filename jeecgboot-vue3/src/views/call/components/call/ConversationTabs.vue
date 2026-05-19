@@ -8,7 +8,9 @@
     <button
       class="ct-tab"
       :class="activeTab === 'analysis' ? 'tab-active' : 'tab-secondary'"
-      @click="$emit('update:activeTab', 'analysis')"
+      :disabled="callActive"
+      :title="callActive ? '通话结束后可查看会话分析' : ''"
+      @click="!callActive && $emit('update:activeTab', 'analysis')"
     >▶ 会话分析</button>
     <div v-if="activeTab === 'transcript'" class="ct-recognizing">
       <span class="ct-rec-dot" :class="{ active: asrConnected }"></span>
@@ -24,10 +26,12 @@ import type { WsStateEnum } from '../../types'
 interface Props {
   activeTab?: string
   asrState?: WsStateEnum | string
+  callActive?: boolean
 }
 const props = withDefaults(defineProps<Props>(), {
   activeTab: 'transcript',
   asrState: 'idle',
+  callActive: false,
 })
 defineEmits<{ 'update:activeTab': [value: string] }>()
 
@@ -44,7 +48,8 @@ const asrConnected = computed(() =>
 }
 .tab-active { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; }
 .tab-secondary { background: #e2e8f0; color: #475569; }
-.tab-secondary:hover { background: #cbd5e1; }
+.tab-secondary:hover:not(:disabled) { background: #cbd5e1; }
+.ct-tab:disabled { opacity: 0.45; cursor: not-allowed; }
 .ct-recognizing { margin-left: auto; font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 5px; }
 .ct-rec-dot {
   width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; transition: background 0.3s;

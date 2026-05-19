@@ -1,13 +1,16 @@
 import { defHttp } from '/@/utils/http/axios'
 import type { AgentStatusEnum, AgentStatusResult, CallListResult, CallDetailResult, CallTurnResult } from './model/callModel'
 
-enum Api {
-  AgentStatus  = '/call/api/v1/agent/status',
-  CallList     = '/call/api/v1/calls',
-  CallDetail   = '/call/api/v1/calls',
-  CallTurns    = '/call/api/v1/calls',
-  CallRemark   = '/call/api/v1/calls',
-}
+const _base = (import.meta.env.VITE_CALL_API_BASE ?? '/call') as string
+
+const Api = {
+  AgentStatus : `${_base}/api/v1/agent/status`,
+  CallList    : `${_base}/api/v1/calls`,
+  CallDetail  : `${_base}/api/v1/calls`,
+  CallTurns   : `${_base}/api/v1/calls`,
+  CallRemark  : `${_base}/api/v1/calls`,
+  AudioUrl    : `${_base}/api/v1/calls`,
+} as const
 
 const httpOpts = { isTransformResponse: false, joinPrefix: false, apiUrl: '' }
 
@@ -39,4 +42,9 @@ export function getCallTurns(callSessionId: string) {
 /** 更新通话备注 */
 export function updateCallRemark(callSessionId: string, remark: string) {
   return defHttp.put({ url: `${Api.CallRemark}/${encodeURIComponent(callSessionId)}/remark`, data: { remark } }, httpOpts)
+}
+
+/** 获取通话录音预签名URL */
+export function getAudioUrl(callSessionId: string) {
+  return defHttp.get({ url: `${Api.AudioUrl}/${encodeURIComponent(callSessionId)}/audio-url` }, httpOpts)
 }

@@ -3,16 +3,10 @@
 function _buildWsUrl(): string {
   const envUrl = (import.meta.env.VITE_CALL_WS_URL ?? '').trim()
   if (envUrl) return envUrl
-  // 根据当前页面自动推导，换环境无需改配置
-  // 开发环境: http://localhost:3100 → ws://localhost:3100/call/call/ws
-  //   Vite 代理 /call → http://后端/jeecg-boot，rewrite 去掉 /call 前缀
-  //   所以 /call/call/ws → 后端 /jeecg-boot/call/ws ✅
-  // 生产环境复用 VITE_GLOB_API_URL，避免 /jeecgboot 与 /jeecg-boot 前缀不一致
+  // 开发和生产环境统一：/call 前缀由 Vite 代理（开发）或 Nginx（生产）转发到后端
+  // /call/call/ws → 后端 /jeecg-boot/call/ws
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const isDev = import.meta.env.DEV
-  const apiBase = (import.meta.env.VITE_GLOB_API_URL ?? '/jeecgboot').trim() || '/jeecgboot'
-  const wsPath = isDev ? '/call/call/ws' : `${apiBase.replace(/\/$/, '')}/call/ws`
-  return `${proto}//${location.host}${wsPath}`
+  return `${proto}//${location.host}/call/call/ws`
 }
 
 export const CALL_WS_CONFIG = {

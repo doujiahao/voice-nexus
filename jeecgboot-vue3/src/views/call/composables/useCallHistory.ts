@@ -1,5 +1,5 @@
 import { ref, computed, readonly } from 'vue'
-import { getCallList, getCallDetail, getCallTurns, updateCallRemark } from '/@/api/call'
+import { getCallList, getCallDetail, getCallTurns, getAudioUrl, updateCallRemark } from '/@/api/call'
 import type { CallRecord, CallDetail, CallListItem, CallTurnItem } from '../types'
 
 const PAGE_SIZE   = 20
@@ -24,7 +24,8 @@ export function useCallHistory() {
       call_session_id: item.call_session_id,
       phone:           item.phone,
       customer_name:   item.customer_name,
-      date:            item.started_at.slice(0, 10),
+      date:            item.started_at?.slice(0, 10) ?? '',
+      time:            item.started_at?.slice(11, 16) ?? '',
       note:            existingNotes.get(item.call_session_id) ?? item.summary_short ?? '',
       duration_sec:    Math.floor((item.duration_ms ?? 0) / 1000),
       active:          selectedId.value === item.call_session_id,
@@ -88,6 +89,34 @@ export function useCallHistory() {
     }
   }
 
+  async function fetchTurnsWithAudio(id: string): Promise<CallTurnItem[]> {
+    const [turnsRes, audioRes] = await Promise.allSettled([
+      getCallTurns(id),
+      getAudioUrl(id),
+    ])
+
+    let turns: CallTurnItem[] = []
+    if (turnsRes.status === 'fulfilled') {
+      const res = turnsRes.value as any
+      if (res.code === 200 && Array.isArray(res.result?.items)) turns = res.result.items as CallTurnItem[]
+    }
+
+    if (audioRes.status === 'fulfilled') {
+      const res = audioRes.value as any
+      if (res.code === 200 && Array.isArray(res.result?.items)) {
+        const urlMap = new Map<string, string>()
+        for (const item of res.result.items) {
+          if (item.turn_id && item.url) urlMap.set(item.turn_id, item.url)
+        }
+        if (urlMap.size > 0) {
+          turns = turns.map(t => urlMap.has(t.turn_id) ? { ...t, audio_url: urlMap.get(t.turn_id)! } : t)
+        }
+      }
+    }
+
+    return turns
+  }
+
   async function fetchDetail(id: string): Promise<CallDetail | null> {
     try {
       const res = await getCallDetail(id) as any
@@ -122,6 +151,7 @@ export function useCallHistory() {
     fetchList,
     fetchMore,
     fetchTurns,
+    fetchTurnsWithAudio,
     fetchDetail,
     selectOnly,
     updateRecordNote,

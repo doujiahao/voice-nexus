@@ -28,6 +28,8 @@ import { CALL_WS_CONFIG } from './config/index'
 import IncomingCallOverlay from './IncomingCallOverlay.vue'
 import CustomerServiceView from './CustomerServiceView.vue'
 
+defineOptions({ name: 'CallWorkspaceIndex' })
+
 const { wsState, reconnectCount, isConnected, connect, disconnect } = useJavaWs()
 const callNotify  = useCallNotify()
 const agentStatus = useAgentStatus()
