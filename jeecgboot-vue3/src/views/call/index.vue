@@ -36,6 +36,10 @@ const agentStatus = useAgentStatus()
 const agentInfo   = useAgentInfo()
 const { incomingCall } = callNotify
 
+watch([incomingCall, isConnected], ([call, connected]) => {
+  console.info('[CallWorkspace] 弹框条件: incomingCall=', call, 'isConnected=', connected, '显示=', !!call && !!connected)
+})
+
 const wsNotice      = ref('')
 const wsNoticeClass = ref('')
 let wsNoticeTimer: ReturnType<typeof setTimeout> | null = null
@@ -61,6 +65,7 @@ watch(wsState, (state, prev) => {
 })
 
 onMounted(() => {
+  console.info('[CallWorkspace] onMounted, wsUrl:', CALL_WS_CONFIG.wsUrl)
   if (CALL_WS_CONFIG.wsUrl) {
     connect({
       wsUrl:                CALL_WS_CONFIG.wsUrl,
@@ -72,6 +77,8 @@ onMounted(() => {
       maxReconnectDelayMs:  CALL_WS_CONFIG.maxReconnectDelayMs,
       maxReconnectAttempts: CALL_WS_CONFIG.maxReconnectAttempts,
     })
+  } else {
+    console.warn('[CallWorkspace] wsUrl 为空，WS 未连接')
   }
   callNotify.init()
   void agentStatus.init()

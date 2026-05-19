@@ -282,6 +282,7 @@ function startCallTimer(): void {
 }
 
 onMounted(() => {
+  console.info('[CustomerServiceView] onMounted')
   fetchCallList()
   // 重进话务平台时，若状态已是 active（模块级状态保留），恢复计时并提示（需求4）
   if (isCallActive.value) {

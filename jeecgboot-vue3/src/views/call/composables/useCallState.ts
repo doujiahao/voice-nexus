@@ -6,6 +6,7 @@ const _phase = ref<CallPhase>('idle')
 
 function _transition(next: CallPhase): void {
   if (_phase.value === next) return
+  console.info('[CallState] 阶段切换:', _phase.value, '→', next)
   _phase.value = next
 }
 

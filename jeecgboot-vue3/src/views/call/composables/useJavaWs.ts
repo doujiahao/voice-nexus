@@ -117,6 +117,7 @@ function _doConnect(): void {
     _wsError.value = null
     _showReloadHint.value = false
     _setState('active')
+    console.info(`${TAG} 连接成功, readyState=`, ws.readyState)
     _resetHeartbeatWatch()
     _startHeartbeat()
     if (_token && _authMode === 'message') {
