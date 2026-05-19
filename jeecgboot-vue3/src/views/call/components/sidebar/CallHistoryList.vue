@@ -5,6 +5,7 @@
       <div class="chl-title">通话记录</div>
 
       <div v-if="isLoading" class="chl-status">加载中...</div>
+      <div v-else-if="error" class="chl-status chl-error">{{ error }}</div>
       <div v-else-if="totalCount === 0" class="chl-status chl-empty">暂无通话记录</div>
 
       <template v-else>
@@ -23,8 +24,8 @@
             <span class="chl-dot" :class="record.active ? 'dot-active' : 'dot-inactive'" />
             <div class="chl-content">
               <div class="chl-header">
-                <span class="chl-phone">{{ record.phone }}</span>
-                <span class="chl-label">用户来电</span>
+                <span class="chl-phone">{{ record.customer_name || record.phone }}</span>
+                <span class="chl-label">{{ directionLabel(record.direction) }}</span>
                 <span class="chl-date">{{ record.date }}</span>
                 <span v-if="record.time" class="chl-time">{{ record.time }}</span>
               </div>
@@ -66,6 +67,13 @@ import AgentAssistPanel from '../call/AgentAssistPanel.vue'
 
 const PREVIEW_CNT = 2
 
+const DIRECTION_LABEL: Record<string, string> = {
+  INBOUND:  '用户来电',
+  OUTBOUND: '外呼',
+  MISSED:   '未接来电',
+}
+function directionLabel(d?: string): string { return DIRECTION_LABEL[d ?? ''] ?? '用户来电' }
+
 interface Props {
   records?:       CallRecord[]
   totalCount?:    number
@@ -78,6 +86,7 @@ interface Props {
   assistResult?:  AgentAssistResult | null
   assistLoading?: boolean
   assistError?:   string | null
+  error?:         string | null
 }
 const props = withDefaults(defineProps<Props>(), {
   records:       () => [],
@@ -91,6 +100,7 @@ const props = withDefaults(defineProps<Props>(), {
   assistResult:  null,
   assistLoading: false,
   assistError:   null,
+  error:         null,
 })
 
 const emit = defineEmits<{
@@ -103,6 +113,7 @@ const emit = defineEmits<{
 const listEl = ref<HTMLElement | null>(null)
 
 let _scrollTimer: ReturnType<typeof setTimeout> | null = null
+let _wasAtTop = false
 
 function onScroll(e: Event): void {
   if (_scrollTimer) return
@@ -115,8 +126,10 @@ function onScroll(e: Event): void {
 function _handleScroll(el: HTMLElement): void {
   const scrollable = el.scrollHeight - el.clientHeight
   if (scrollable <= 0 || !props.expanded) return
+  const atTop = el.scrollTop <= 0
+  if (atTop && _wasAtTop && !props.isLoading) { emit('refresh') }
+  _wasAtTop = atTop
   const ratio = el.scrollTop / scrollable
-  if (el.scrollTop === 0) { emit('refresh'); return }
   if (ratio >= 2 / 3 && props.hasMore && !props.isLoadingMore) emit('load-more')
 }
 </script>
@@ -129,6 +142,7 @@ function _handleScroll(el: HTMLElement): void {
 
 .chl-status { font-size: 12px; color: #94a3b8; text-align: center; padding: 16px 0; }
 .chl-empty  { color: #cbd5e1; }
+.chl-error  { color: #ef4444; }
 
 .chl-list--collapsed { overflow: hidden; }
 .chl-list--expanded  {

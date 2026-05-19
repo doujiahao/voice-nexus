@@ -50,6 +50,8 @@ export interface CallRecord {
   call_session_id: string
   phone: string
   customer_name: string
+  direction: string
+  status: string
   date: string
   time: string
   note: string
@@ -66,6 +68,7 @@ export interface CallListItem {
   customer_name: string
   agent_id: string
   agent_name: string
+  direction: string
   status: string
   turn_count: number
   summary_short: string
@@ -116,7 +119,7 @@ export interface CallDetail {
     conclusion: string
     nlp_enabled: boolean
     updated_at: string
-  }
+  } | null
   record_dir?: string
   remark?: string
 }
