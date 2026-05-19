@@ -190,31 +190,11 @@ public class CallWebSocket {
         log.info("[CallWS] 推送来电结束: agentUserId={}, callId={}, fsCallId={}", agentUserId, callId, fsCallId);
     }
 
-    public static void pushIncomingCallCancelled(String agentUserId, String callId, String fsCallId, String reason) {
-        JSONObject msg = new JSONObject();
-        msg.put("type", "incoming_call_cancelled");
-        msg.put("call_id", callId);
-        msg.put("fs_call_id", fsCallId);
-        msg.put("reason", reason);
-        sendMessage(agentUserId, msg.toJSONString());
-        log.info("[CallWS] 推送来电取消: agentUserId={}, callId={}, fsCallId={}, reason={}", agentUserId, callId, fsCallId, reason);
-    }
-
-    public static void pushIncomingCallAnswered(String agentUserId, String callId, String fsCallId) {
-        JSONObject msg = new JSONObject();
-        msg.put("type", "incoming_call_answered");
-        msg.put("call_id", callId);
-        msg.put("fs_call_id", fsCallId);
-        sendMessage(agentUserId, msg.toJSONString());
-        log.info("[CallWS] 推送来电接听: agentUserId={}, callId={}, fsCallId={}", agentUserId, callId, fsCallId);
-    }
-
     public static void pushCallSession(String agentUserId, String callSessionId) {
         JSONObject msg = new JSONObject();
         msg.put("type", "call_session");
         msg.put("call_session_id", callSessionId);
         sendMessage(agentUserId, msg.toJSONString());
-        log.info("[CallWS] 推送通话会话: agentUserId={}, callSessionId={}", agentUserId, callSessionId);
     }
 
     public static void pushAgentStatus(String agentUserId, String status) {
@@ -222,7 +202,6 @@ public class CallWebSocket {
         msg.put("type", "agent_status");
         msg.put("status", status);
         sendMessage(agentUserId, msg.toJSONString());
-        log.info("[CallWS] 推送坐席状态: agentUserId={}, status={}", agentUserId, status);
     }
 
     public static void pushCallState(String agentUserId, String state) {
@@ -230,7 +209,6 @@ public class CallWebSocket {
         msg.put("type", "call_state");
         msg.put("state", state);
         sendMessage(agentUserId, msg.toJSONString());
-        log.info("[CallWS] 推送通话状态: agentUserId={}, state={}", agentUserId, state);
     }
 
     public static void pushAsrResult(String agentUserId, String correctedText, String speakerRole,
