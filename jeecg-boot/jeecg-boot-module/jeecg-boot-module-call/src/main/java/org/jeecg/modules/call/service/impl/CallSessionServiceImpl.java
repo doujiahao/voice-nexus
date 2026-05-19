@@ -267,9 +267,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 }
                 session.setStatus("TALKING");
                 session.setAnswerTime(new Date());
-                try {
-                    updateById(session);
-                } catch (com.baomidou.mybatisplus.core.exceptions.OptimisticLockerException e) {
+                if (!updateById(session)) {
                     log.warn("[CallEvent] ANSWERED 乐观锁冲突，跳过: fsCallId={}, sessionId={}", fsCallId, session.getId());
                     result.put("status", session.getStatus());
                     break;
@@ -329,9 +327,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         session.setEndedBy(endedBy);
         session.setHangupCause(hangupCause);
         session.setDurationSec(durationSec);
-        try {
-            updateById(session);
-        } catch (com.baomidou.mybatisplus.core.exceptions.OptimisticLockerException e) {
+        if (!updateById(session)) {
             log.warn("[CallEvent] endSession 乐观锁冲突: fsCallId={}, sessionId={}, 将重试", session.getFsCallId(), session.getId());
             session = getById(session.getId());
             if (session == null || "ENDED".equals(session.getStatus())) {
