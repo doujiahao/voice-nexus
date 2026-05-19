@@ -12,9 +12,12 @@ import org.jeecg.modules.call.service.impl.CallEndProcessor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -84,20 +87,78 @@ public class CallRecoveryHandler {
         }
         int cleaned = 0;
         for (String queueKey : queueKeys) {
-            Set<String> sessionIds = stringRedisTemplate.opsForSet().members(queueKey);
-            if (sessionIds == null) continue;
-            for (String sessionId : sessionIds) {
-                CallSession session = callSessionMapper.selectById(sessionId);
-                if (session == null || "ENDED".equals(session.getStatus())) {
-                    stringRedisTemplate.opsForSet().remove(queueKey, sessionId);
-                    cleaned++;
-                    log.info("[Recovery] 清理队列无效 session: queueKey={}, sessionId={}", queueKey, sessionId);
+            try {
+                DataType queueType = stringRedisTemplate.type(queueKey);
+                if (queueType == null || DataType.NONE.equals(queueType)) {
+                    continue;
                 }
+                if (DataType.LIST.equals(queueType)) {
+                    cleaned += cleanStaleRedisListQueue(queueKey);
+                } else if (DataType.SET.equals(queueType)) {
+                    cleaned += cleanStaleRedisSetQueue(queueKey);
+                } else {
+                    Boolean deleted = stringRedisTemplate.delete(queueKey);
+                    log.warn("[Recovery] 删除类型异常的 Redis 队列: queueKey={}, type={}, deleted={}",
+                            queueKey, queueType, deleted);
+                }
+            } catch (DataAccessException e) {
+                log.warn("[Recovery] 清理 Redis 队列失败，已跳过: queueKey={}", queueKey, e);
             }
         }
         if (cleaned > 0) {
             log.warn("[Recovery] 清理了 {} 个 Redis 队列中的无效 session", cleaned);
         }
+    }
+
+    private int cleanStaleRedisListQueue(String queueKey) {
+        Long size = stringRedisTemplate.opsForList().size(queueKey);
+        if (size == null || size == 0) {
+            return 0;
+        }
+        List<String> sessionIds = stringRedisTemplate.opsForList().range(queueKey, 0, -1);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return 0;
+        }
+        int cleaned = 0;
+        List<String> staleSessionIds = findStaleSessionIds(sessionIds);
+        for (String sessionId : staleSessionIds) {
+            Long removed = stringRedisTemplate.opsForList().remove(queueKey, 0, sessionId);
+            if (removed != null && removed > 0) {
+                cleaned += removed.intValue();
+                log.info("[Recovery] 清理 List 队列无效 session: queueKey={}, sessionId={}, removed={}",
+                        queueKey, sessionId, removed);
+            }
+        }
+        return cleaned;
+    }
+
+    private int cleanStaleRedisSetQueue(String queueKey) {
+        Set<String> sessionIds = stringRedisTemplate.opsForSet().members(queueKey);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return 0;
+        }
+        int cleaned = 0;
+        List<String> staleSessionIds = findStaleSessionIds(sessionIds);
+        for (String sessionId : staleSessionIds) {
+            Long removed = stringRedisTemplate.opsForSet().remove(queueKey, sessionId);
+            if (removed != null && removed > 0) {
+                cleaned += removed.intValue();
+                log.info("[Recovery] 清理 Set 队列无效 session: queueKey={}, sessionId={}, removed={}",
+                        queueKey, sessionId, removed);
+            }
+        }
+        return cleaned;
+    }
+
+    private List<String> findStaleSessionIds(Iterable<String> sessionIds) {
+        List<String> staleSessionIds = new ArrayList<>();
+        for (String sessionId : sessionIds) {
+            CallSession session = callSessionMapper.selectById(sessionId);
+            if (session == null || "ENDED".equals(session.getStatus())) {
+                staleSessionIds.add(sessionId);
+            }
+        }
+        return staleSessionIds;
     }
 
     private void recoverAgentStatus() {
