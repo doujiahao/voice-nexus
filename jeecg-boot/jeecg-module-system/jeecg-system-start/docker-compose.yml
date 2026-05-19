@@ -6,7 +6,7 @@ services:
     restart: always
     environment:
       - TZ=Asia/Shanghai
-      - PARAMS=--spring.profiles.active=dev --server.port=8080 --logging.file.path=./log --mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl
+      - PARAMS=--spring.profiles.active=dev --spring.flyway.enabled=true --server.port=8080 --logging.file.path=./log --mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl
       - JAVA_OPTS=-server -Xmx2048M -Xms2048M
     ports:
       - 19157:8080
