@@ -107,6 +107,28 @@ public class CallRouteServiceImpl implements ICallRouteService {
             log.info("[Route] 分配坐席: fsCallId={}, agentId={}, agentUserId={}, extension={}",
                     fsCallId, agent.getId(), agent.getUserId(), agent.getExtension());
 
+            // 回填 RINGING 事件先于路由创建的 session 的 agentId（竞态修复）
+            CallSession ringingSession = callSessionMapper.selectOne(
+                    new LambdaQueryWrapper<CallSession>()
+                            .eq(CallSession::getFsCallId, fsCallId)
+                            .eq(CallSession::getStatus, "RINGING")
+                            .last("LIMIT 1"));
+            if (ringingSession != null && ringingSession.getAgentId() == null) {
+                ringingSession.setAgentId(agent.getId());
+                callSessionMapper.updateById(ringingSession);
+                log.info("[Route] 回填 RINGING session 的 agentId: fsCallId={}, sessionId={}, agentId={}",
+                        fsCallId, ringingSession.getId(), agent.getId());
+                // 补推来电预告（RINGING 事件因 agentId 为空跳过了推送）
+                CallWebSocket.pushIncomingCallPending(
+                        agent.getUserId(),
+                        ringingSession.getId(),
+                        ringingSession.getCustomerPhone(),
+                        null,
+                        fsCallId);
+                log.info("[Route] 补推来电预告: fsCallId={}, sessionId={}, agentUserId={}",
+                        fsCallId, ringingSession.getId(), agent.getUserId());
+            }
+
             // 路由成功：只返回坐席信息，不创建 CallSession、不更新坐席状态、不推送来电弹窗
             // 这些操作由 RINGING 事件处理
             RouteResponseDTO resp = new RouteResponseDTO();
