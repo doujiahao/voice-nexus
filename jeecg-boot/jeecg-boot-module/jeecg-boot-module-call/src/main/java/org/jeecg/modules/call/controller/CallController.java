@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
 import org.jeecg.common.api.vo.Result;
 import org.jeecg.common.system.vo.LoginUser;
+import org.jeecg.modules.call.dto.CallListVO;
 import org.jeecg.modules.call.entity.*;
 import org.jeecg.modules.call.mapper.*;
 import org.jeecg.modules.call.service.IAgentProfileService;
@@ -29,6 +30,8 @@ public class CallController {
     private IAgentProfileService agentProfileService;
     @Autowired
     private ICallSessionService callSessionService;
+    @Autowired
+    private CallSessionMapper callSessionMapper;
     @Autowired
     private CallTurnMapper callTurnMapper;
     @Autowired
@@ -66,39 +69,25 @@ public class CallController {
             @RequestParam(name = "end_time", required = false) String endTime) {
         log.info("[CallAPI] 查询通话列表: page={}, pageSize={}, status={}, startTime={}, endTime={}", page, pageSize, status, startTime, endTime);
 
-        LambdaQueryWrapper<CallSession> wrapper = new LambdaQueryWrapper<>();
-        if (status != null && !"ALL".equals(status)) {
-            wrapper.eq(CallSession::getStatus, status);
-        }
-        // 过滤孤儿记录：status=QUEUING 且无任何 turn 的记录不展示
-        wrapper.and(w -> w.ne(CallSession::getStatus, "QUEUING").or().isNotNull(CallSession::getAgentId));
-        wrapper.orderByDesc(CallSession::getCreateTime);
+        Page<CallListVO> pageResult = callSessionMapper.selectCallListPage(
+                new Page<>(page, pageSize), status, startTime, endTime);
 
-        Page<CallSession> pageResult = callSessionService.page(new Page<>(page, pageSize), wrapper);
-
-        List<JSONObject> items = pageResult.getRecords().stream().map(s -> {
+        List<JSONObject> items = pageResult.getRecords().stream().map(vo -> {
             JSONObject item = new JSONObject();
-            item.put("call_session_id", s.getId());
-            item.put("started_at", s.getCreateTime());
-            item.put("ended_at", s.getEndTime());
-            item.put("duration_ms", s.getDurationSec() != null ? s.getDurationSec() * 1000L : null);
-            item.put("phone", s.getCustomerPhone());
-            item.put("status", s.getStatus());
-            item.put("agent_id", s.getAgentId());
-            if (s.getCustomerId() != null) {
-                Customer c = customerMapper.selectById(s.getCustomerId());
-                if (c != null) item.put("customer_name", c.getName());
-            }
-            if (s.getAgentId() != null) {
-                AgentProfile agent = agentProfileMapper.selectById(s.getAgentId());
-                if (agent != null) item.put("agent_name", agent.getAgentNo());
-            }
-            Long turnCount = callTurnMapper.selectCount(
-                    new LambdaQueryWrapper<CallTurn>().eq(CallTurn::getSessionId, s.getId()));
-            item.put("turn_count", turnCount);
-            if (s.getSummary() != null && !s.getSummary().isEmpty()) {
+            item.put("call_session_id", vo.getId());
+            item.put("started_at", vo.getCreateTime());
+            item.put("ended_at", vo.getEndTime());
+            item.put("duration_ms", vo.getDurationSec() != null ? vo.getDurationSec() * 1000L : null);
+            item.put("phone", vo.getCustomerPhone());
+            item.put("status", vo.getStatus());
+            item.put("agent_id", vo.getAgentId());
+            item.put("direction", vo.getDirection());
+            item.put("customer_name", vo.getCustomerName());
+            item.put("agent_name", vo.getAgentName());
+            item.put("turn_count", vo.getTurnCount());
+            if (vo.getSummary() != null && !vo.getSummary().isEmpty()) {
                 try {
-                    JSONObject summary = com.alibaba.fastjson.JSON.parseObject(s.getSummary());
+                    JSONObject summary = com.alibaba.fastjson.JSON.parseObject(vo.getSummary());
                     String intent = summary.getString("customer_intent");
                     item.put("summary_short", intent != null ? intent : "");
                 } catch (Exception ignored) {

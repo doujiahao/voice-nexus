@@ -1,4 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.jeecg.modules.call.mapper.CallSessionMapper">
+
+    <select id="selectCallListPage" resultType="org.jeecg.modules.call.dto.CallListVO">
+        SELECT
+            cs.id,
+            cs.fs_call_id AS fsCallId,
+            cs.direction,
+            cs.status,
+            cs.customer_phone AS customerPhone,
+            cs.customer_id AS customerId,
+            cs.agent_id AS agentId,
+            cs.skill_group_id AS skillGroupId,
+            cs.create_time AS createTime,
+            cs.end_time AS endTime,
+            cs.duration_sec AS durationSec,
+            cs.ended_by AS endedBy,
+            cs.summary,
+            cs.remark,
+            c.name AS customerName,
+            ap.agent_no AS agentName,
+            (SELECT COUNT(*) FROM call_turn ct WHERE ct.session_id = cs.id AND ct.del_flag = 0) AS turnCount
+        FROM call_session cs
+        LEFT JOIN customer c ON c.id = cs.customer_id
+        LEFT JOIN agent_profile ap ON ap.id = cs.agent_id
+        <where>
+            cs.del_flag = 0
+            <if test="status != null and status != 'ALL'">
+                AND cs.status = #{status}
+            </if>
+            <choose>
+                <when test="startTime != null and endTime != null">
+                    AND cs.create_time BETWEEN #{startTime} AND #{endTime}
+                </when>
+                <when test="startTime != null">
+                    AND cs.create_time &gt;= #{startTime}
+                </when>
+                <when test="endTime != null">
+                    AND cs.create_time &lt;= #{endTime}
+                </when>
+            </choose>
+            AND (cs.status != 'QUEUING' OR cs.agent_id IS NOT NULL)
+        </where>
+        ORDER BY cs.create_time DESC
+    </select>
+
 </mapper>

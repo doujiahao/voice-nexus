@@ -211,6 +211,15 @@ public class CallWebSocket {
         sendMessage(agentUserId, msg.toJSONString());
     }
 
+    public static void pushIncomingCallCancelled(String agentUserId, String callId, String phone, String fsCallId) {
+        JSONObject msg = new JSONObject();
+        msg.put("type", "incoming_call_cancelled");
+        msg.put("call_id", callId);
+        msg.put("phone", phone);
+        msg.put("fs_call_id", fsCallId);
+        sendMessage(agentUserId, msg.toJSONString());
+    }
+
     public static void pushAgentStatus(String agentUserId, String status) {
         JSONObject msg = new JSONObject();
         msg.put("type", "agent_status");

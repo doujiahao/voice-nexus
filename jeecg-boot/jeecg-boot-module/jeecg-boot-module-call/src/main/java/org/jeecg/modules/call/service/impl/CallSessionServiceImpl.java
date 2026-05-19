@@ -17,6 +17,7 @@ import org.jeecg.modules.call.service.IAgentProfileService;
 import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         return t;
     });
     private static final ConcurrentHashMap<String, ScheduledFuture<?>> pendingRingingTimeouts = new ConcurrentHashMap<>();
+    private static final String SESSION_LOCK_PREFIX = "call:session:lock:";
+    private static final long SESSION_LOCK_TTL_SEC = 30;
 
     @Autowired
     private CallEventLogMapper callEventLogMapper;
@@ -51,6 +54,8 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     private ICallQueueService callQueueService;
     @Autowired
     private CallEndProcessor callEndProcessor;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     @Override
     public CallSession getByFsCallId(String fsCallId) {
@@ -69,21 +74,39 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         // RINGING 事件：创建 CallSession（如果不存在）
         if ("RINGING".equals(event.getEventType())) {
             if (session == null) {
-                session = new CallSession();
-                session.setFsCallId(fsCallId);
-                session.setDirection("INBOUND");
-                session.setStatus("RINGING");
-                if (event.getMetadata() != null) {
-                    session.setCustomerPhone(event.getMetadata().get("customerPhone"));
-                    session.setCalledNumber(event.getMetadata().get("calledNumber"));
-                    session.setSkillGroupId(event.getMetadata().get("skillGroupId"));
-                    session.setAgentId(event.getMetadata().get("agentId"));
+                String lockKey = SESSION_LOCK_PREFIX + fsCallId;
+                boolean locked = false;
+                try {
+                    locked = Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lockKey, "1", java.time.Duration.ofSeconds(SESSION_LOCK_TTL_SEC)));
+                } catch (Exception e) {
+                    log.warn("[CallEvent] Redis 锁获取异常，fallback 为 selectOne: fsCallId={}", fsCallId, e);
                 }
-                session.setRingTime(new Date());
-                session.setQueueEnterTime(new Date());
-                save(session);
-                log.info("[CallEvent] RINGING 创建呼入会话: fsCallId={}, sessionId={}, agentId={}",
-                        fsCallId, session.getId(), session.getAgentId());
+                if (!locked) {
+                    // 锁获取失败，等待后重查
+                    try { Thread.sleep(200); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                    session = getByFsCallId(fsCallId);
+                    if (session != null) {
+                        log.info("[CallEvent] RINGING 锁等待后查到已有会话: fsCallId={}, sessionId={}", fsCallId, session.getId());
+                    }
+                }
+                if (session == null) {
+                    session = new CallSession();
+                    session.setFsCallId(fsCallId);
+                    session.setDirection("INBOUND");
+                    session.setStatus("RINGING");
+                    if (event.getMetadata() != null) {
+                        session.setCustomerPhone(event.getMetadata().get("customerPhone"));
+                        session.setCalledNumber(event.getMetadata().get("calledNumber"));
+                        session.setSkillGroupId(event.getMetadata().get("skillGroupId"));
+                        session.setAgentId(event.getMetadata().get("agentId"));
+                    }
+                    session.setRingTime(new Date());
+                    session.setQueueEnterTime(new Date());
+                    save(session);
+                    log.info("[CallEvent] RINGING 创建呼入会话: fsCallId={}, sessionId={}, agentId={}",
+                            fsCallId, session.getId(), session.getAgentId());
+                }
+                try { redisTemplate.delete(lockKey); } catch (Exception ignored) {}
             }
 
             // 更新坐席状态为 RINGING
@@ -189,6 +212,27 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 if (endedTimeout != null) {
                     endedTimeout.cancel(false);
                 }
+                // 振铃中坐席挂断 = 拒接：会话放回排队，推送 incoming_call_cancelled
+                if ("RINGING".equals(session.getStatus())
+                        && event.getEndedBy() != null
+                        && !"CUSTOMER".equals(event.getEndedBy())) {
+                    log.info("[CallEvent] 振铃中坐席拒接: fsCallId={}, sessionId={}, endedBy={}", fsCallId, session.getId(), event.getEndedBy());
+                    session.setStatus("QUEUING");
+                    updateById(session);
+                    if (session.getAgentId() != null) {
+                        AgentProfile rejectAgent = agentProfileMapper.selectById(session.getAgentId());
+                        if (rejectAgent != null) {
+                            agentProfileService.changeStatus(rejectAgent.getUserId(), AgentStatusEnum.ONLINE, "坐席拒接(Linphone)");
+                            CallWebSocket.pushCallState(rejectAgent.getUserId(), "idle");
+                            CallWebSocket.pushIncomingCallCancelled(rejectAgent.getUserId(), session.getId(), session.getCustomerPhone(), fsCallId);
+                            log.info("[CallEvent] 已推送拒接通知: fsCallId={}, sessionId={}, agentUserId={}",
+                                    fsCallId, session.getId(), rejectAgent.getUserId());
+                        }
+                    }
+                    removeFromQueueIfNeeded(session);
+                    result.put("status", "QUEUING");
+                    break;
+                }
                 endSession(session, event.getEndedBy(),
                         event.getMetadata() != null ? event.getMetadata().get("hangup_cause") : "NORMAL",
                         event.getDurationSec());
@@ -197,10 +241,22 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
             case "ANSWERED":
                 log.info("[CallEvent] 处理 ANSWERED: fsCallId={}, sessionId={}, agentId={}, oldStatus={}",
                         fsCallId, session.getId(), session.getAgentId(), session.getStatus());
+                // 取消 RINGING 超时兜底（ANSWERED 先于 RINGING_CONFIRMED 到达时）
+                ScheduledFuture<?> answeredTimeout = pendingRingingTimeouts.remove(fsCallId);
+                if (answeredTimeout != null) {
+                    answeredTimeout.cancel(false);
+                    log.info("[CallEvent] ANSWERED 取消 RINGING 超时: fsCallId={}", fsCallId);
+                }
                 if ("ENDED".equals(session.getStatus())) {
                     log.warn("[CallEvent] 忽略已结束会话的接通事件: fsCallId={}, sessionId={}, agentId={}",
                             fsCallId, session.getId(), session.getAgentId());
                     result.put("status", session.getStatus());
+                    break;
+                }
+                // 幂等：已 TALKING 说明前端已接听，跳过重复处理
+                if ("TALKING".equals(session.getStatus())) {
+                    log.info("[CallEvent] 会话已接通，跳过重复 ANSWED: fsCallId={}, sessionId={}", fsCallId, session.getId());
+                    result.put("status", "TALKING");
                     break;
                 }
                 if (session.getAgentId() == null) {
@@ -211,7 +267,13 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 }
                 session.setStatus("TALKING");
                 session.setAnswerTime(new Date());
-                updateById(session);
+                try {
+                    updateById(session);
+                } catch (com.baomidou.mybatisplus.core.exceptions.OptimisticLockerException e) {
+                    log.warn("[CallEvent] ANSWERED 乐观锁冲突，跳过: fsCallId={}, sessionId={}", fsCallId, session.getId());
+                    result.put("status", session.getStatus());
+                    break;
+                }
                 log.info("[CallEvent] 已更新会话为 TALKING: fsCallId={}, sessionId={}, agentId={}",
                         fsCallId, session.getId(), session.getAgentId());
                 AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
@@ -219,6 +281,11 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                     log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
                             fsCallId, session.getId(), agent.getId(), agent.getUserId());
                     agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.TALKING, "通话接通");
+                    // 通知前端通话已接通（Linphone 接听 → 前端同步）
+                    CallWebSocket.pushCallState(agent.getUserId(), "active");
+                    CallWebSocket.pushCallSession(agent.getUserId(), session.getId());
+                    log.info("[CallEvent] ANSWED 已推送 call_state:active + call_session: fsCallId={}, sessionId={}, agentUserId={}",
+                            fsCallId, session.getId(), agent.getUserId());
                 } else {
                     log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                             fsCallId, session.getId(), session.getAgentId());
@@ -253,12 +320,31 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     public void endSession(CallSession session, String endedBy, String hangupCause, Integer durationSec) {
         log.info("[CallEvent] 准备结束会话: fsCallId={}, sessionId={}, agentId={}, endedBy={}, hangupCause={}, durationSec={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), endedBy, hangupCause, durationSec);
+        if ("ENDED".equals(session.getStatus())) {
+            log.warn("[CallEvent] 会话已结束，跳过重复 endSession: fsCallId={}, sessionId={}", session.getFsCallId(), session.getId());
+            return;
+        }
         session.setStatus("ENDED");
         session.setEndTime(new Date());
         session.setEndedBy(endedBy);
         session.setHangupCause(hangupCause);
         session.setDurationSec(durationSec);
-        updateById(session);
+        try {
+            updateById(session);
+        } catch (com.baomidou.mybatisplus.core.exceptions.OptimisticLockerException e) {
+            log.warn("[CallEvent] endSession 乐观锁冲突: fsCallId={}, sessionId={}, 将重试", session.getFsCallId(), session.getId());
+            session = getById(session.getId());
+            if (session == null || "ENDED".equals(session.getStatus())) {
+                log.warn("[CallEvent] endSession 重查已结束或不存在，跳过: fsCallId={}", session != null ? session.getFsCallId() : "null");
+                return;
+            }
+            session.setStatus("ENDED");
+            session.setEndTime(new Date());
+            session.setEndedBy(endedBy);
+            session.setHangupCause(hangupCause);
+            session.setDurationSec(durationSec);
+            updateById(session);
+        }
         log.info("[CallEvent] 已更新会话为 ENDED: fsCallId={}, sessionId={}, agentId={}, hangupCause={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), hangupCause);
         removeFromQueueIfNeeded(session);

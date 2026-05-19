@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -52,6 +53,8 @@ public class CallSession implements Serializable {
     private String summary;
     private String audioUrl;
     private String remark;
+    @Version
+    private Integer version;
     @TableLogic
     private Integer delFlag;
     private String createBy;

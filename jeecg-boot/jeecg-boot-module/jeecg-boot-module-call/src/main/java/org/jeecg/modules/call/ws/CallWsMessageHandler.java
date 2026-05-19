@@ -61,6 +61,25 @@ public class CallWsMessageHandler {
 
         if ("accept".equals(action)) {
             log.info("[CallWS] 坐席接听来电: userId={}, callId={}, msg={}", userId, callId, msg);
+
+            // 幂等：如果会话已 TALKING（Linphone 先接听），跳过 bridge，仅补推 streaming
+            CallSession session = callSessionService.getById(callId);
+            if (session != null && "TALKING".equals(session.getStatus())) {
+                log.info("[CallWS] 会话已接通，跳过 bridge: userId={}, callId={}", userId, callId);
+                CallWebSocket.pushCallState(userId, "active");
+                CallWebSocket.pushCallSession(userId, callId);
+                // 补推 streaming（Linphone 接听时可能未启动推流）
+                if (session.getFsCallId() != null) {
+                    AgentProfile agent = agentProfileService.getByUserId(userId);
+                    if (agent != null && agent.getExtension() != null) {
+                        String rtmpUrl = buildRtmpUrl(callId);
+                        FreeSwitchClient.startStreaming(session.getFsCallId(), callId, rtmpUrl);
+                        log.info("[CallWS] 补推 streaming 完成: userId={}, callId={}, fsCallId={}", userId, callId, session.getFsCallId());
+                    }
+                }
+                return;
+            }
+
             callSessionService.updateStatus(callId, "TALKING");
             log.info("[CallWS] 已更新会话为 TALKING: userId={}, callId={}", userId, callId);
             agentProfileService.changeStatus(userId, AgentStatusEnum.TALKING, "坐席接听");
@@ -68,7 +87,6 @@ public class CallWsMessageHandler {
             CallWebSocket.pushCallSession(userId, callId);
 
             // 通知 FreeSwitch 桥接并开始流式传输
-            CallSession session = callSessionService.getById(callId);
             if (session != null && session.getFsCallId() != null) {
                 AgentProfile agent = agentProfileService.getByUserId(userId);
                 if (agent != null && agent.getExtension() != null) {
