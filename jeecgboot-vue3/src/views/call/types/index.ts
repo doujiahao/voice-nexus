@@ -139,13 +139,6 @@ export interface AnalysisResult {
   suggestions: string[]
 }
 
-export interface AiConfig {
-  baseUrl: string
-  apiKey: string
-  model: string
-  timeoutMs: number
-}
-
 export interface AsrConfig {
   baseUrl: string
   language?: string

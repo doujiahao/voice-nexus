@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import java.util.Map;
 
 @Slf4j
-@Tag(name = "ASR 代理转发")
+@Tag(name = "AI 代理转发")
 @RestController
 @RequestMapping("/api/v1/asr")
 public class AsrProxyController {
@@ -62,6 +62,29 @@ public class AsrProxyController {
                     .body(response.getBody());
         } catch (Exception e) {
             log.error("ASR 代理转发失败", e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body("{\"code\":-1,\"message\":\"Gateway unreachable: " + e.getMessage() + "\"}");
+        }
+    }
+
+    @Operation(summary = "坐席实时辅助（代理转发到 Gateway）")
+    @PostMapping("/agent-assist/analyze")
+    public ResponseEntity<String> agentAssist(@RequestBody String body) {
+        String gatewayUrl = callProperties.getGateway().getBaseUrl() + "/api/v1/nlp/agent-assist/analyze";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<String> entity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    gatewayUrl, HttpMethod.POST, entity, String.class);
+            return ResponseEntity.status(response.getStatusCode())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response.getBody());
+        } catch (Exception e) {
+            log.error("AgentAssist 代理转发失败", e);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body("{\"code\":-1,\"message\":\"Gateway unreachable: " + e.getMessage() + "\"}");
         }

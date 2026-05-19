@@ -9,13 +9,13 @@ import org.jeecg.modules.call.entity.AgentProfile;
 import org.jeecg.modules.call.entity.CallEventLog;
 import org.jeecg.modules.call.entity.CallSession;
 import org.jeecg.modules.call.enums.AgentStatusEnum;
+import org.jeecg.modules.call.ws.CallWebSocket;
 import org.jeecg.modules.call.mapper.AgentProfileMapper;
 import org.jeecg.modules.call.mapper.CallEventLogMapper;
 import org.jeecg.modules.call.mapper.CallSessionMapper;
 import org.jeecg.modules.call.service.IAgentProfileService;
 import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallSessionService;
-import org.jeecg.modules.call.ws.CallWebSocket;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +52,60 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                 fsCallId, event.getEventType(), event.getEndedBy(), event.getDurationSec(), event.getMetadata());
         CallSession session = getByFsCallId(fsCallId);
         Map<String, Object> result = new HashMap<>();
+
+        // RINGING 事件：创建 CallSession（如果不存在）
+        if ("RINGING".equals(event.getEventType())) {
+            if (session == null) {
+                session = new CallSession();
+                session.setFsCallId(fsCallId);
+                session.setDirection("INBOUND");
+                session.setStatus("RINGING");
+                if (event.getMetadata() != null) {
+                    session.setCustomerPhone(event.getMetadata().get("customerPhone"));
+                    session.setCalledNumber(event.getMetadata().get("calledNumber"));
+                    session.setSkillGroupId(event.getMetadata().get("skillGroupId"));
+                    session.setAgentId(event.getMetadata().get("agentId"));
+                }
+                session.setRingTime(new Date());
+                session.setQueueEnterTime(new Date());
+                save(session);
+                log.info("[CallEvent] RINGING 创建呼入会话: fsCallId={}, sessionId={}, agentId={}",
+                        fsCallId, session.getId(), session.getAgentId());
+            }
+
+            // 更新坐席状态为 RINGING
+            if (session.getAgentId() != null) {
+                AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
+                if (agent != null) {
+                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
+                    // 推送来电弹窗
+                    CallWebSocket.pushIncomingCall(
+                            agent.getUserId(),
+                            session.getId(),
+                            session.getCustomerPhone(),
+                            null,
+                            fsCallId);
+                    log.info("[CallEvent] RINGING 已推送来电弹窗: fsCallId={}, sessionId={}, agentUserId={}",
+                            fsCallId, session.getId(), agent.getUserId());
+                }
+            }
+
+            // 记录事件日志
+            CallEventLog eventLog = new CallEventLog();
+            eventLog.setSessionId(session.getId());
+            eventLog.setEventType(event.getEventType());
+            eventLog.setEventTime(new Date());
+            eventLog.setOperatorType("FSS");
+            if (event.getMetadata() != null) {
+                eventLog.setDetail(JSON.toJSONString(event.getMetadata()));
+            }
+            callEventLogMapper.insert(eventLog);
+
+            result.put("status", "RINGING");
+            result.put("acknowledged", true);
+            result.put("call_session_id", session.getId());
+            return result;
+        }
 
         if (session == null) {
             log.warn("[Inbound] 通话事件找不到会话: fsCallId={}, eventType={}", fsCallId, event.getEventType());
@@ -100,7 +154,6 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                     result.put("status", session.getStatus());
                     break;
                 }
-                String previousStatus = session.getStatus();
                 session.setStatus("TALKING");
                 session.setAnswerTime(new Date());
                 updateById(session);
@@ -108,17 +161,9 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                         fsCallId, session.getId(), session.getAgentId());
                 AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
                 if (agent != null) {
-                    log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}, previousStatus={}",
-                            fsCallId, session.getId(), agent.getId(), agent.getUserId(), previousStatus);
+                    log.info("[CallEvent] 准备更新接通坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
+                            fsCallId, session.getId(), agent.getId(), agent.getUserId());
                     agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.TALKING, "通话接通");
-                    if ("RINGING".equals(previousStatus)) {
-                        CallWebSocket.pushIncomingCallAnswered(agent.getUserId(), session.getId(), session.getFsCallId());
-                    }
-                    CallWebSocket.pushCallSession(agent.getUserId(), session.getId());
-                    CallWebSocket.pushAgentStatus(agent.getUserId(), "on_call");
-                    CallWebSocket.pushCallState(agent.getUserId(), "active");
-                    log.info("[CallEvent] 已推送话机接听状态: fsCallId={}, sessionId={}, userId={}, previousStatus={}, agentStatus=on_call, callState=active",
-                            fsCallId, session.getId(), agent.getUserId(), previousStatus);
                 } else {
                     log.warn("[CallEvent] 接通事件找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                             fsCallId, session.getId(), session.getAgentId());
@@ -153,7 +198,6 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
     public void endSession(CallSession session, String endedBy, String hangupCause, Integer durationSec) {
         log.info("[CallEvent] 准备结束会话: fsCallId={}, sessionId={}, agentId={}, endedBy={}, hangupCause={}, durationSec={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), endedBy, hangupCause, durationSec);
-        String previousStatus = session.getStatus();
         session.setStatus("ENDED");
         session.setEndTime(new Date());
         session.setEndedBy(endedBy);
@@ -163,28 +207,15 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         log.info("[CallEvent] 已更新会话为 ENDED: fsCallId={}, sessionId={}, agentId={}, hangupCause={}",
                 session.getFsCallId(), session.getId(), session.getAgentId(), hangupCause);
         removeFromQueueIfNeeded(session);
-        pushIncomingCancelledIfRinging(session, previousStatus, hangupCause);
 
         // 坐席恢复空闲
         if (session.getAgentId() != null) {
             AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
             if (agent != null) {
-                log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}, previousStatus={}",
-                        session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId(), previousStatus);
-                if ("RINGING".equals(previousStatus)) {
-                    String reason = "来电取消: " + hangupCause;
-                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, reason);
-                    CallWebSocket.pushAgentStatus(agent.getUserId(), "idle");
+                log.info("[CallEvent] 准备更新结束坐席状态: fsCallId={}, sessionId={}, agentId={}, userId={}",
+                        session.getFsCallId(), session.getId(), agent.getId(), agent.getUserId());
+                agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.ONLINE, "通话结束");
                     CallWebSocket.pushCallState(agent.getUserId(), "idle");
-                    log.info("[CallEvent] 已推送振铃取消状态: fsCallId={}, sessionId={}, userId={}, hangupCause={}, agentStatus=idle, callState=idle",
-                            session.getFsCallId(), session.getId(), agent.getUserId(), hangupCause);
-                } else {
-                    agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.WRAP_UP, "通话结束");
-                    CallWebSocket.pushAgentStatus(agent.getUserId(), "wrap_up");
-                    CallWebSocket.pushCallState(agent.getUserId(), "idle");
-                    log.info("[CallEvent] 已推送通话结束状态: fsCallId={}, sessionId={}, userId={}, previousStatus={}, agentStatus=wrap_up, callState=idle",
-                            session.getFsCallId(), session.getId(), agent.getUserId(), previousStatus);
-                }
             } else {
                 log.warn("[CallEvent] 结束会话找不到坐席档案: fsCallId={}, sessionId={}, agentId={}",
                         session.getFsCallId(), session.getId(), session.getAgentId());
@@ -205,20 +236,5 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         callQueueService.remove(session.getSkillGroupId(), session.getId());
         log.info("[CallEvent] 已清理排队队列: fsCallId={}, sessionId={}, skillGroupId={}",
                 session.getFsCallId(), session.getId(), session.getSkillGroupId());
-    }
-
-    private void pushIncomingCancelledIfRinging(CallSession session, String previousStatus, String hangupCause) {
-        if (!"RINGING".equals(previousStatus) || session.getAgentId() == null) {
-            return;
-        }
-        AgentProfile agent = agentProfileMapper.selectById(session.getAgentId());
-        if (agent == null || agent.getUserId() == null) {
-            log.warn("[CallEvent] 来电取消通知跳过，找不到坐席用户: fsCallId={}, sessionId={}, agentId={}",
-                    session.getFsCallId(), session.getId(), session.getAgentId());
-            return;
-        }
-        CallWebSocket.pushIncomingCallCancelled(agent.getUserId(), session.getId(), session.getFsCallId(), hangupCause);
-        log.info("[CallEvent] 已推送来电弹框取消: fsCallId={}, sessionId={}, userId={}, hangupCause={}",
-                session.getFsCallId(), session.getId(), agent.getUserId(), hangupCause);
     }
 }

@@ -30,13 +30,8 @@ export const CALL_API_BASE = (import.meta.env.VITE_CALL_API_BASE ?? '') as strin
 /** Java WS 推送的实时转写消息 type 字段值 */
 export const ASR_WS_MSG_TYPE = (import.meta.env.VITE_CALL_ASR_MSG_TYPE ?? 'asr_result') as string
 
-/** AI 分析服务配置 */
-export const AI_CONFIG = {
-  baseUrl:   (import.meta.env.VITE_AI_BASE_URL   ?? '') as string,
-  apiKey:    (import.meta.env.VITE_AI_API_KEY     ?? '') as string,
-  model:     (import.meta.env.VITE_AI_MODEL       ?? 'deepseek-chat') as string,
-  timeoutMs: Number(import.meta.env.VITE_AI_TIMEOUT_MS ?? 30000),
-}
+/** Java WS 推送的实时坐席辅助分析消息 type 字段值 */
+export const AGENT_ASSIST_WS_MSG_TYPE = (import.meta.env.VITE_CALL_AGENT_ASSIST_MSG_TYPE ?? 'agent_assist') as string
 
 export const TRANSCRIPT_CONFIG = {
   maxMessages:           500,

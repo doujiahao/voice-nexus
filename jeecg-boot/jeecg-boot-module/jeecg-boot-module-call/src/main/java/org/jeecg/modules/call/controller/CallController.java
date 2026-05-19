@@ -66,6 +66,8 @@ public class CallController {
         if (status != null && !"ALL".equals(status)) {
             wrapper.eq(CallSession::getStatus, status);
         }
+        // 过滤孤儿记录：status=QUEUING 且无任何 turn 的记录不展示
+        wrapper.and(w -> w.ne(CallSession::getStatus, "QUEUING").or().isNotNull(CallSession::getAgentId));
         wrapper.orderByDesc(CallSession::getCreateTime);
 
         Page<CallSession> pageResult = callSessionService.page(new Page<>(page, pageSize), wrapper);
@@ -283,5 +285,17 @@ public class CallController {
     public Result<?> deleteTag(@PathVariable String callSessionId, @PathVariable String tagId) {
         callTagMapper.deleteById(tagId);
         return Result.OK("删除成功");
+    }
+
+    @Operation(summary = "更新通话备注")
+    @PutMapping("/calls/{callSessionId}/remark")
+    public Result<?> updateRemark(@PathVariable String callSessionId, @RequestBody JSONObject body) {
+        CallSession session = callSessionService.getById(callSessionId);
+        if (session == null) {
+            return Result.error("通话记录不存在");
+        }
+        session.setRemark(body.getString("remark"));
+        callSessionService.updateById(session);
+        return Result.OK("备注更新成功");
     }
 }
