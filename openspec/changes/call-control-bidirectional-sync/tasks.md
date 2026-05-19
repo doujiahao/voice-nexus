@@ -5,17 +5,17 @@
 
 ## 2. Java 后端 ANSWERED 推送（haoqi）
 
-- [ ] 2.1 CallSessionServiceImpl.handleEvent() ANSWERED 分支末尾增加 `CallWebSocket.pushCallState(agentUserId, "active")` 和 `CallWebSocket.pushCallSession(agentUserId, sessionId)`
-- [ ] 2.2 CallSessionServiceImpl.handleEvent() ANSWERED 分支增加幂等检查：session 已 TALKING 则跳过状态更新和推送
+- [x] 2.1 CallSessionServiceImpl.handleEvent() ANSWERED 分支末尾增加 `CallWebSocket.pushCallState(agentUserId, "active")` 和 `CallWebSocket.pushCallSession(agentUserId, sessionId)`
+- [x] 2.2 CallSessionServiceImpl.handleEvent() ANSWERED 分支增加幂等检查：session 已 TALKING 则跳过状态更新和推送
 
 ## 3. Java 后端接听幂等（haoqi）
 
-- [ ] 3.1 CallWsMessageHandler.handleCallResponse() accept 分支增加幂等检查：session.status=TALKING 时跳过 bridge，仅补推 startStreaming + pushCallState + pushCallSession
+- [x] 3.1 CallWsMessageHandler.handleCallResponse() accept 分支增加幂等检查：session.status=TALKING 时跳过 bridge，仅补推 startStreaming + pushCallState + pushCallSession
 
 ## 4. Java 后端振铃中拒接识别（haoqi）
 
-- [ ] 4.1 CallSessionServiceImpl.handleEvent() CALL_ENDED 分支增加判断：session.status=RINGING 且 endedBy≠CUSTOMER 时，走拒接逻辑（session→QUEUING，agent→ONLINE，推送 incoming_call_cancelled + call_state:idle）
-- [ ] 4.2 CallWebSocket 新增 `pushIncomingCallCancelled()` 方法
+- [x] 4.1 CallSessionServiceImpl.handleEvent() CALL_ENDED 分支增加判断：session.status=RINGING 且 endedBy≠CUSTOMER 时，走拒接逻辑（session→QUEUING，agent→ONLINE，推送 incoming_call_cancelled + call_state:idle）
+- [x] 4.2 CallWebSocket 新增 `pushIncomingCallCancelled()` 方法
 
 ## 5. 前端 call_state:active 完善处理（张成）
 
