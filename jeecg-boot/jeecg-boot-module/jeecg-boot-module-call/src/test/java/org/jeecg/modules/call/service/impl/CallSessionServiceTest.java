@@ -75,6 +75,7 @@ class CallSessionServiceTest {
         agent.setUserId("user-001");
 
         doReturn(session).when(callSessionService).getByFsCallId("fs-001");
+        when(callSessionMapper.updateById(any(CallSession.class))).thenReturn(1);
         when(agentProfileMapper.selectById("agent-001")).thenReturn(agent);
 
         CallEventDTO event = new CallEventDTO();
@@ -125,6 +126,7 @@ class CallSessionServiceTest {
         agent.setUserId("user-001");
 
         doReturn(session).when(callSessionService).getByFsCallId("fs-001");
+        when(callSessionMapper.updateById(any(CallSession.class))).thenReturn(1);
         when(agentProfileMapper.selectById("agent-001")).thenReturn(agent);
 
         CallEventDTO event = new CallEventDTO();

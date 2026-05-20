@@ -113,7 +113,7 @@ public class CallRouteServiceImpl implements ICallRouteService {
                             .eq(CallSession::getFsCallId, fsCallId)
                             .eq(CallSession::getStatus, "RINGING")
                             .last("LIMIT 1"));
-            if (ringingSession != null && ringingSession.getAgentId() == null) {
+            if (ringingSession != null && (ringingSession.getAgentId() == null || ringingSession.getAgentId().isEmpty())) {
                 ringingSession.setAgentId(agent.getId());
                 callSessionMapper.updateById(ringingSession);
                 log.info("[Route] 回填 RINGING session 的 agentId: fsCallId={}, sessionId={}, agentId={}",

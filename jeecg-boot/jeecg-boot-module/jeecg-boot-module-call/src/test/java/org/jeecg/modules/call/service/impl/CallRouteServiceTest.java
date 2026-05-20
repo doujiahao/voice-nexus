@@ -86,15 +86,12 @@ class CallRouteServiceTest {
     void route_shouldAssignAgent_whenAvailable() {
         when(skillGroupMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(skillGroup);
         when(customerContactMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-        when(callSessionMapper.insert(any(CallSession.class))).thenAnswer(invocation -> {
-            CallSession session = invocation.getArgument(0);
-            session.setId("call-001");
-            return 1;
-        });
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(skillGroupAgentMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(sga));
         when(agentProfileMapper.selectById("agent-001")).thenReturn(agent);
+        // No RINGING session exists yet (route runs before RINGING event in normal flow)
+        when(callSessionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         RouteRequestDTO req = new RouteRequestDTO();
         req.setSkillGroup("DEFAULT");
@@ -109,11 +106,9 @@ class CallRouteServiceTest {
             assertEquals("8001", resp.getTargetExtension());
             assertEquals(20, resp.getRingTimeoutSec());
 
-            callWebSocket.verify(() -> CallWebSocket.pushIncomingCall(
-                    "user-001", "call-001", "13800000001", null, "fs-001"));
+            // Route no longer calls pushIncomingCall or changeStatus — those are done by RINGING event handler
+            verify(redisTemplate).delete(anyString());
         }
-        verify(agentProfileService).changeStatus("user-001", AgentStatusEnum.RINGING, "来电分配");
-        verify(redisTemplate).delete(anyString());
     }
 
     @Test
@@ -149,7 +144,6 @@ class CallRouteServiceTest {
         skillGroup.setQueueMaxSize(10);
         when(skillGroupMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(skillGroup);
         when(customerContactMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-        when(callSessionMapper.insert(any(CallSession.class))).thenReturn(1);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(skillGroupAgentMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(Collections.emptyList());

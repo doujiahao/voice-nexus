@@ -98,8 +98,10 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                         session.setCustomerPhone(event.getMetadata().get("customerPhone"));
                         session.setCalledNumber(event.getMetadata().get("calledNumber"));
                         session.setSkillGroupId(event.getMetadata().get("skillGroupId"));
-                        session.setAgentId(event.getMetadata().get("agentId"));
-                        session.setBLegFsCallId(event.getMetadata().get("bLegFsCallId"));
+                        String agentId = event.getMetadata().get("agentId");
+                        session.setAgentId((agentId != null && !agentId.isEmpty()) ? agentId : null);
+                        String bLegFsCallId = event.getMetadata().get("bLegFsCallId");
+                        session.setBLegFsCallId((bLegFsCallId != null && !bLegFsCallId.isEmpty()) ? bLegFsCallId : null);
                     }
                     session.setRingTime(new Date());
                     session.setQueueEnterTime(new Date());
