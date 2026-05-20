@@ -27,6 +27,19 @@ public class FreeSwitchClient {
         FreeSwitchClient.callProperties = callProperties;
     }
 
+    public static void answer(String fsCallId, String callSessionId) {
+        try {
+            JSONObject body = new JSONObject();
+            body.put("action", "answer");
+            body.put("fs_call_id", fsCallId);
+            body.put("call_session_id", callSessionId);
+            postAction(body);
+            log.info("[FSClient] answer 指令已发送: fsCallId={}, sessionId={}", fsCallId, callSessionId);
+        } catch (Exception e) {
+            log.error("[FSClient] answer 调用失败: fsCallId={}, sessionId={}", fsCallId, callSessionId, e);
+        }
+    }
+
     public static void bridge(String fsCallId, String callSessionId, String agentExtension) {
         try {
             JSONObject body = new JSONObject();

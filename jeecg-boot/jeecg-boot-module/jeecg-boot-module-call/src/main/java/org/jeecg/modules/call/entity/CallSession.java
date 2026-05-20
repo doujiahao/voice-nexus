@@ -25,6 +25,7 @@ public class CallSession implements Serializable {
     @TableId(type = IdType.ASSIGN_ID)
     private String id;
     private String fsCallId;
+    private String bLegFsCallId;
     private String direction;
     private String status;
     private String customerId;
