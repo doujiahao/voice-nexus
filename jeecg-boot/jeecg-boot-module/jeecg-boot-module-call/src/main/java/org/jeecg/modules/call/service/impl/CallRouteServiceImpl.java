@@ -7,6 +7,7 @@ import org.jeecg.modules.call.dto.RouteResponseDTO;
 import org.jeecg.modules.call.entity.*;
 import org.jeecg.modules.call.enums.AgentStatusEnum;
 import org.jeecg.modules.call.mapper.*;
+import org.jeecg.modules.call.service.IAgentProfileService;
 import org.jeecg.modules.call.service.ICallQueueService;
 import org.jeecg.modules.call.service.ICallRouteService;
 import org.jeecg.modules.call.ws.CallWebSocket;
@@ -40,6 +41,8 @@ public class CallRouteServiceImpl implements ICallRouteService {
     private CustomerContactMapper customerContactMapper;
     @Autowired
     private ICallQueueService callQueueService;
+    @Autowired
+    private IAgentProfileService agentProfileService;
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
@@ -107,32 +110,27 @@ public class CallRouteServiceImpl implements ICallRouteService {
             log.info("[Route] 分配坐席: fsCallId={}, agentId={}, agentUserId={}, extension={}",
                     fsCallId, agent.getId(), agent.getUserId(), agent.getExtension());
 
-            // 回填 RINGING 事件先于路由创建的 session 的 agentId（竞态修复）
-            CallSession ringingSession = callSessionMapper.selectOne(
-                    new LambdaQueryWrapper<CallSession>()
-                            .eq(CallSession::getFsCallId, fsCallId)
-                            .eq(CallSession::getStatus, "RINGING")
-                            .last("LIMIT 1"));
-            if (ringingSession != null && (ringingSession.getAgentId() == null || ringingSession.getAgentId().isEmpty())) {
-                ringingSession.setAgentId(agent.getId());
-                callSessionMapper.updateById(ringingSession);
-                log.info("[Route] 回填 RINGING session 的 agentId: fsCallId={}, sessionId={}, agentId={}",
-                        fsCallId, ringingSession.getId(), agent.getId());
-                // 补推来电预告（RINGING 事件因 agentId 为空跳过了推送）
-                CallWebSocket.pushIncomingCallPending(
-                        agent.getUserId(),
-                        ringingSession.getId(),
-                        ringingSession.getCustomerPhone(),
-                        null,
-                        fsCallId);
-                log.info("[Route] 补推来电预告: fsCallId={}, sessionId={}, agentUserId={}",
-                        fsCallId, ringingSession.getId(), agent.getUserId());
-            }
+            // 预创建 CallSession（状态 RINGING），确保后续事件有 session 可依附
+            CallSession session = createInboundRingSession(fsCallId, request, skillGroup, customer, agent);
+            log.info("[Route] 已预创建 RINGING 会话: fsCallId={}, sessionId={}, agentId={}",
+                    fsCallId, session.getId(), agent.getId());
 
-            // 路由成功：只返回坐席信息，不创建 CallSession、不更新坐席状态、不推送来电弹窗
-            // 这些操作由 RINGING 事件处理
+            // 更新坐席状态为 RINGING
+            agentProfileService.changeStatus(agent.getUserId(), AgentStatusEnum.RINGING, "来电分配");
+            // 推送来电预告（不弹窗），等待 RINGING_CONFIRMED 后再弹窗
+            CallWebSocket.pushIncomingCallPending(
+                    agent.getUserId(),
+                    session.getId(),
+                    request.getCustomerPhone(),
+                    null,
+                    fsCallId);
+            log.info("[Route] 已推送来电预告: fsCallId={}, sessionId={}, agentUserId={}",
+                    fsCallId, session.getId(), agent.getUserId());
+
+            // 路由成功：返回坐席信息 + callSessionId
             RouteResponseDTO resp = new RouteResponseDTO();
             resp.setSuccess(true);
+            resp.setCallSessionId(session.getId());
             resp.setRouteAction("RING");
             resp.setTargetAgentId(agent.getId());
             resp.setTargetExtension(agent.getExtension());
@@ -180,6 +178,45 @@ public class CallRouteServiceImpl implements ICallRouteService {
         callSessionMapper.insert(session);
         log.info("[Route] 已创建呼入排队会话: fsCallId={}, sessionId={}, status={}, skillGroupId={}",
                 fsCallId, session.getId(), session.getStatus(), skillGroup.getId());
+        return session;
+    }
+
+    private CallSession createInboundRingSession(String fsCallId, RouteRequestDTO request,
+                                                  SkillGroup skillGroup, Customer customer,
+                                                  AgentProfile agent) {
+        // 去重：同一 fsCallId 若已存在非 ENDED 的记录则复用
+        CallSession existing = callSessionMapper.selectOne(
+                new LambdaQueryWrapper<CallSession>()
+                        .eq(CallSession::getFsCallId, fsCallId)
+                        .ne(CallSession::getStatus, "ENDED")
+                        .last("LIMIT 1"));
+        if (existing != null) {
+            log.info("[Route] 复用已有会话: fsCallId={}, sessionId={}, status={}",
+                    fsCallId, existing.getId(), existing.getStatus());
+            // 补充 agentId 如果缺失
+            if (existing.getAgentId() == null || existing.getAgentId().isEmpty()) {
+                existing.setAgentId(agent.getId());
+                callSessionMapper.updateById(existing);
+            }
+            return existing;
+        }
+
+        CallSession session = new CallSession();
+        session.setFsCallId(fsCallId);
+        session.setDirection("INBOUND");
+        session.setStatus("RINGING");
+        session.setCustomerPhone(request.getCustomerPhone());
+        session.setCalledNumber(request.getCalledNumber());
+        session.setSkillGroupId(skillGroup.getId());
+        session.setAgentId(agent.getId());
+        session.setQueueEnterTime(new Date());
+        session.setRingTime(new Date());
+        if (customer != null) {
+            session.setCustomerId(customer.getId());
+        }
+        callSessionMapper.insert(session);
+        log.info("[Route] 已创建呼入 RINGING 会话: fsCallId={}, sessionId={}, agentId={}",
+                fsCallId, session.getId(), agent.getId());
         return session;
     }
 

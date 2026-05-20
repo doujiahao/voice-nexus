@@ -71,7 +71,7 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
         CallSession session = getByFsCallId(fsCallId);
         Map<String, Object> result = new HashMap<>();
 
-        // RINGING 事件：创建 CallSession（如果不存在）
+        // RINGING 事件：创建 CallSession（如果不存在）或补充已有 session 的字段
         if ("RINGING".equals(event.getEventType())) {
             if (session == null) {
                 String lockKey = SESSION_LOCK_PREFIX + fsCallId;
@@ -110,6 +110,27 @@ public class CallSessionServiceImpl extends ServiceImpl<CallSessionMapper, CallS
                             fsCallId, session.getId(), session.getAgentId());
                 }
                 try { redisTemplate.delete(lockKey); } catch (Exception ignored) {}
+            } else {
+                // session 已存在（路由预创建），补充 RINGING 事件中的额外字段
+                boolean updated = false;
+                if (event.getMetadata() != null) {
+                    String bLegFsCallId = event.getMetadata().get("bLegFsCallId");
+                    if (bLegFsCallId != null && !bLegFsCallId.isEmpty() && session.getBLegFsCallId() == null) {
+                        session.setBLegFsCallId(bLegFsCallId);
+                        updated = true;
+                    }
+                    // 如果 agentId 缺失，从事件中补充
+                    String agentId = event.getMetadata().get("agentId");
+                    if (agentId != null && !agentId.isEmpty() && (session.getAgentId() == null || session.getAgentId().isEmpty())) {
+                        session.setAgentId(agentId);
+                        updated = true;
+                    }
+                }
+                if (updated) {
+                    updateById(session);
+                }
+                log.info("[CallEvent] RINGING session 已存在（路由预创建），幂等处理: fsCallId={}, sessionId={}, agentId={}",
+                        fsCallId, session.getId(), session.getAgentId());
             }
 
             // 更新坐席状态为 RINGING
